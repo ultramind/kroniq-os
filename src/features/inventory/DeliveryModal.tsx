@@ -1,0 +1,14 @@
+import { DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
+import { useEffect, useState } from 'react'
+import type { InventoryLocation, Product } from '../../types'
+import { supabase } from '../../supabase'
+
+type Values = { productId: string; supplierName: string; quantity: number; unitCost: number; receivedAt: string; locationId: string }
+type FormValues = Omit<Values, 'receivedAt'> & { receivedAt: Dayjs }
+export function DeliveryModal({ open, products, saving, onClose, onSave }: { open: boolean; products: Product[]; saving: boolean; onClose: () => void; onSave: (values: Values) => Promise<void> }) {
+  const [form] = Form.useForm<FormValues>()
+  const [locations, setLocations] = useState<InventoryLocation[]>([])
+  useEffect(() => { if (!open) { form.resetFields(); return }; form.setFieldValue('receivedAt', dayjs()); if (supabase) void supabase.from('inventory_locations').select('id, name, location_type, active').eq('active', true).then(({ data }) => { const rows = (data ?? []).map((row) => ({ id: row.id, name: row.name, type: row.location_type, active: row.active } as InventoryLocation)); setLocations(rows); const shopFloor = rows.find((location) => location.type === 'shop_floor'); if (shopFloor) form.setFieldValue('locationId', shopFloor.id) }) }, [form, open])
+  return <Modal open={open} forceRender title="Receive supplier delivery" okText="Record delivery" confirmLoading={saving} onCancel={onClose} onOk={() => void form.submit()}><Form form={form} layout="vertical" onFinish={(values) => onSave({ ...values, receivedAt: values.receivedAt.format('YYYY-MM-DD') })}><Form.Item name="productId" label="Product" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={products.map((product) => ({ value: product.id, label: `${product.name} (${product.stock} on shop floor)` }))} /></Form.Item><Form.Item name="locationId" label="Receive into" rules={[{ required: true, message: 'Choose where this stock is being received.' }]}><Select options={locations.map((location) => ({ value: location.id, label: `${location.name}${location.type === 'shop_floor' ? ' (checkout stock)' : ''}` }))} /></Form.Item><Form.Item name="supplierName" label="Supplier" rules={[{ required: true }]}><Input placeholder="Supplier name" /></Form.Item><div className="grid grid-cols-2 gap-4"><Form.Item name="quantity" label="Quantity received" rules={[{ required: true }]}><InputNumber min={1} precision={0} className="w-full" /></Form.Item><Form.Item name="unitCost" label="New unit cost (₦)" rules={[{ required: true }]}><InputNumber min={0} precision={2} className="w-full" /></Form.Item></div><Form.Item name="receivedAt" label="Received date" rules={[{ required: true, message: 'Select when this stock was received.' }]} extra="Use the supplier’s delivery date for accurate stock records."><DatePicker className="w-full" format="DD MMM YYYY" /></Form.Item></Form></Modal>
+}

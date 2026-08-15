@@ -1,0 +1,48 @@
+import { create } from 'zustand'
+import type { CartItem, PaymentMethod, Product, Role } from './types'
+
+type PosState = {
+  cart: CartItem[]
+  role: Role
+  search: string
+  paymentMethod: PaymentMethod
+  discountPercent: number
+  setRole: (role: Role) => void
+  setSearch: (search: string) => void
+  setPaymentMethod: (method: PaymentMethod) => void
+  setDiscountPercent: (value: number) => void
+  replaceCart: (cart: CartItem[]) => void
+  addToCart: (product: Product) => void
+  addToCartQuantity: (product: Product, quantity: number) => void
+  updateQuantity: (id: string, quantity: number) => void
+  updateUnitPrice: (id: string, price: number) => void
+  clearCart: () => void
+}
+
+export const usePosStore = create<PosState>((set) => ({
+  cart: [],
+  role: 'cashier',
+  search: '',
+  paymentMethod: 'cash',
+  discountPercent: 0,
+  setRole: (role) => set({ role }),
+  setSearch: (search) => set({ search }),
+  setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
+  setDiscountPercent: (discountPercent) => set({ discountPercent }),
+  replaceCart: (cart) => set({ cart }),
+  addToCart: (product) => set((state) => {
+    const item = state.cart.find((cartItem) => cartItem.id === product.id)
+    if (item) return { cart: state.cart.map((cartItem) => cartItem.id === product.id ? { ...cartItem, quantity: Math.min(cartItem.quantity + 1, product.stock) } : cartItem) }
+    return product.stock > 0 ? { cart: [...state.cart, { ...product, quantity: 1 }] } : state
+  }),
+  addToCartQuantity: (product, quantity) => set((state) => {
+    const quantityToAdd = Math.max(0, Math.floor(quantity))
+    if (!quantityToAdd || !product.stock) return state
+    const item = state.cart.find((cartItem) => cartItem.id === product.id)
+    if (item) return { cart: state.cart.map((cartItem) => cartItem.id === product.id ? { ...cartItem, quantity: Math.min(cartItem.quantity + quantityToAdd, product.stock) } : cartItem) }
+    return { cart: [...state.cart, { ...product, quantity: Math.min(quantityToAdd, product.stock) }] }
+  }),
+  updateQuantity: (id, quantity) => set((state) => ({ cart: quantity < 1 ? state.cart.filter((item) => item.id !== id) : state.cart.map((item) => item.id === id ? { ...item, quantity } : item) })),
+  updateUnitPrice: (id, price) => set((state) => ({ cart: state.cart.map((item) => item.id === id ? { ...item, price: Math.max(0, Number.isFinite(price) ? price : item.price) } : item) })),
+  clearCart: () => set({ cart: [], search: '', paymentMethod: 'cash', discountPercent: 0 }),
+}))
