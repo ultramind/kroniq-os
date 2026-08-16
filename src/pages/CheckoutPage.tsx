@@ -1,7 +1,8 @@
-import { SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
+import { CameraOutlined, SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { Badge, Button, Card, Drawer, Input, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { useEffect, useState } from 'react'
+import type { InputRef } from 'antd'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { CartItem, PaymentMethod, Product } from '../types'
@@ -9,6 +10,7 @@ import type { CreditDetails } from '../features/pos/checkout.service'
 import { CartPanel } from '../features/pos/CartPanel'
 import { HeldSales } from '../features/pos/HeldSales'
 import { QuantityKeypadModal } from '../features/pos/QuantityKeypadModal'
+import { CameraBarcodeScannerModal } from '../features/pos/CameraBarcodeScannerModal'
 import { publishCustomerDisplay } from '../features/pos/customerDisplay'
 import { db } from '../db'
 import { usePosStore } from '../store'
@@ -24,7 +26,7 @@ type Props = {
   onDiscountChange?: (value: number) => void
   paymentMethod: PaymentMethod
   onSearchChange: (value: string) => void
-  onBarcodeLookup: (code: string) => void
+  onBarcodeLookup: (code: string) => Product | undefined
   onQuantityChange: (id: string, quantity: number) => void
   onUnitPriceChange: (id: string, price: number) => void
   onPaymentChange: (method: PaymentMethod) => void
@@ -40,6 +42,8 @@ export function CheckoutPage({ products, search, cart, total, role = 'cashier', 
   const [searchParams] = useSearchParams()
   const [quantityProduct, setQuantityProduct] = useState<Product>()
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const searchInputRef = useRef<InputRef>(null)
   const heldSales = useLiveQuery(() => db.heldSales.toArray(), []) ?? []
   const hold = onHold ?? (() => {
     void db.heldSales.add({ id: crypto.randomUUID(), items: cart, paymentMethod, createdAt: new Date().toISOString() })
@@ -53,6 +57,10 @@ export function CheckoutPage({ products, search, cart, total, role = 'cashier', 
     display?.focus()
   }
   const quantityAlreadyInCart = quantityProduct ? cart.find((item) => item.id === quantityProduct.id)?.quantity ?? 0 : 0
+  const openScannedProduct = (code: string) => {
+    const product = onBarcodeLookup(code)
+    if (product) setQuantityProduct(product)
+  }
   const columns: TableColumnsType<Product> = [
     {
       title: 'Product',
@@ -76,16 +84,7 @@ export function CheckoutPage({ products, search, cart, total, role = 'cashier', 
     </div>
     <Card className="checkout-catalogue-card min-w-0" bodyStyle={{ display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0 }}>
       <div className="border-b border-slate-100 p-4 md:p-5">
-        <Input.Search
-          size="large"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          onSearch={onBarcodeLookup}
-          placeholder="Search name, SKU, or scan barcode"
-          enterButton={<Button size="large" icon={<SearchOutlined />}>Search</Button>}
-          allowClear
-          className="checkout-product-search"
-        />
+        <div className="flex flex-col gap-2 sm:flex-row"><Input ref={searchInputRef} autoFocus size="large" value={search} onChange={(event) => onSearchChange(event.target.value)} onPressEnter={() => openScannedProduct(search)} placeholder="Search name, SKU, or scan barcode" allowClear className="checkout-product-search w-full sm:flex-1" /><div className="grid grid-cols-2 gap-2 sm:flex"><Button size="large" className="!h-auto" icon={<SearchOutlined />} onClick={() => openScannedProduct(search)}>Search</Button><Button size="large" className="!h-auto" icon={<CameraOutlined />} aria-label="Scan product barcode with camera" onClick={() => setScannerOpen(true)}>Scan</Button></div></div>
         <div className="mt-3 flex items-center justify-between gap-3"><Typography.Text type="secondary" className="text-xs">{products.length} products available</Typography.Text><Typography.Text type="secondary" className="hidden text-xs sm:inline">Tap a product to choose quantity</Typography.Text></div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -122,5 +121,5 @@ export function CheckoutPage({ products, search, cart, total, role = 'cashier', 
     <Drawer title={<span className="flex items-center gap-2"><ShoppingCartOutlined /> Current sale <span className="text-sm font-normal text-slate-500">({cartItemCount} items)</span></span>} placement="right" open={cartDrawerOpen} onClose={() => { setCartDrawerOpen(false); navigate('/checkout', { replace: true }) }} width="min(100vw, 430px)" className="lg:hidden" bodyStyle={{ padding: 16 }}>
     {cartPanel}
   </Drawer>
-  <QuantityKeypadModal product={quantityProduct} maxQuantity={Math.max(0, (quantityProduct?.stock ?? 0) - quantityAlreadyInCart)} role={role} flexiblePricingEnabled={flexiblePricingEnabled} open={Boolean(quantityProduct)} onClose={() => setQuantityProduct(undefined)} onConfirm={(quantity, agreedPrice, reason) => { if (quantityProduct) state.addToCartQuantity(quantityProduct, quantity, agreedPrice, reason) }} /></>
+  <QuantityKeypadModal product={quantityProduct} maxQuantity={Math.max(0, (quantityProduct?.stock ?? 0) - quantityAlreadyInCart)} role={role} flexiblePricingEnabled={flexiblePricingEnabled} open={Boolean(quantityProduct)} onClose={() => { setQuantityProduct(undefined); window.setTimeout(() => searchInputRef.current?.focus(), 100) }} onConfirm={(quantity, agreedPrice, reason, pack) => { if (quantityProduct) { const item = pack ? { ...quantityProduct, id: `${quantityProduct.id}:pack:${pack.id}`, name: `${quantityProduct.name} · ${pack.name}`, sku: pack.sku ?? quantityProduct.sku, price: pack.price, costPrice: quantityProduct.costPrice * pack.unitsPerPack, stock: Math.floor(quantityProduct.stock / pack.unitsPerPack), sourceProductId: quantityProduct.id, packagingId: pack.id, packageName: pack.name, unitsPerPackage: pack.unitsPerPack } : quantityProduct; state.addToCartQuantity(item, quantity, agreedPrice, reason) } window.setTimeout(() => searchInputRef.current?.focus(), 100) }} /><CameraBarcodeScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={(barcode) => { onSearchChange(barcode); openScannedProduct(barcode) }} /></>
 }

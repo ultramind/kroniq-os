@@ -74,7 +74,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
       p_discount_kobo: Math.round((sale.discount ?? 0) * 100),
       p_payment_method: sale.paymentMethod,
       p_sold_at: sale.createdAt,
-      p_items: resolved.items.map((item) => ({ product_id: item.id, quantity: item.quantity, unit_price_kobo: Math.round(item.price * 100), price_override_reason: item.priceOverrideReason ?? null })),
+      p_items: resolved.items.map((item) => ({ product_id: item.sourceProductId ?? item.id, packaging_id: item.packagingId ?? null, quantity: item.quantity, unit_price_kobo: Math.round(item.price * 100), price_override_reason: item.priceOverrideReason ?? null })),
       p_credit: sale.paymentMethod === 'credit' ? { customer_name: sale.creditCustomerName, customer_phone: sale.creditCustomerPhone, due_date: sale.creditDueDate, initial_payment_kobo: Math.round((sale.creditInitialPayment ?? 0) * 100) } : null,
     })
     if (saleError) return { synced, error: `Sale sync: ${saleError.message}` }
@@ -94,7 +94,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
 /** Keeps the checkout catalogue available locally after an online refresh. */
 export async function pullProducts(): Promise<{ loaded: number; error?: string }> {
   if (!supabase || !navigator.onLine) return { loaded: 0 }
-  const response = await supabase.from('products').select('id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, description, image_url, image_urls, online_published, is_featured, categories(name)').eq('active', true).order('name')
+  const response = await supabase.from('products').select('id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, base_unit, description, image_url, image_urls, online_published, is_featured, categories(name), product_packaging(id,name,units_per_pack,sku,price_kobo,active)').eq('active', true).order('name')
   let data: any[] | null = response.data
   let error = response.error
   // Allow checkout to keep refreshing during the rollout if this client reaches a database
@@ -107,7 +107,7 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
   if (error) return { loaded: 0, error: error.message }
   const products = (data ?? []).map((row) => {
     const category = Array.isArray(row.categories) ? row.categories[0] : row.categories
-    return { id: row.id, name: row.name, sku: row.sku, price: row.price_kobo / 100, costPrice: (row.cost_price_kobo ?? 0) / 100, minimumSellingPrice: row.minimum_selling_price_kobo === null || row.minimum_selling_price_kobo === undefined ? undefined : row.minimum_selling_price_kobo / 100, stock: row.stock_quantity, lowStockThreshold: row.low_stock_threshold ?? 10, category: category?.name ?? 'Uncategorised', description: row.description ?? undefined, imageUrl: row.image_url ?? undefined, imageUrls: row.image_urls?.length ? row.image_urls : row.image_url ? [row.image_url] : [], onlinePublished: row.online_published ?? false, featured: row.is_featured ?? false }
+    return { id: row.id, name: row.name, sku: row.sku, price: row.price_kobo / 100, costPrice: (row.cost_price_kobo ?? 0) / 100, minimumSellingPrice: row.minimum_selling_price_kobo === null || row.minimum_selling_price_kobo === undefined ? undefined : row.minimum_selling_price_kobo / 100, stock: row.stock_quantity, baseUnit: row.base_unit ?? 'piece', packages: (row.product_packaging ?? []).filter((pack: any) => pack.active !== false).map((pack: any) => ({ id: pack.id, name: pack.name, unitsPerPack: pack.units_per_pack, sku: pack.sku ?? undefined, price: pack.price_kobo / 100, active: pack.active })), lowStockThreshold: row.low_stock_threshold ?? 10, category: category?.name ?? 'Uncategorised', description: row.description ?? undefined, imageUrl: row.image_url ?? undefined, imageUrls: row.image_urls?.length ? row.image_urls : row.image_url ? [row.image_url] : [], onlinePublished: row.online_published ?? false, featured: row.is_featured ?? false }
   })
   await db.transaction('rw', db.products, async () => { await db.products.clear(); await db.products.bulkPut(products) })
   return { loaded: products.length }

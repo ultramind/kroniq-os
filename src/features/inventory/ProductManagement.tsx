@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Button, Card, Form, Image, Input, InputNumber, Modal, Radio, Switch, Table, Tag, Typography, Upload, message } from 'antd'
-import { DeleteOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
+import { Button, Card, Form, Image, Input, InputNumber, Modal, Radio, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd'
+import { DeleteOutlined, EditOutlined, InboxOutlined, UploadOutlined } from '@ant-design/icons'
 import { formatNaira } from '../../lib/currency'
 import { supabase } from '../../supabase'
 import type { Product, Role } from '../../types'
+import { ProductPackagingModal } from './ProductPackagingModal'
 
 const { Text } = Typography
 const MAX_IMAGES = 2
@@ -25,6 +26,7 @@ type Props = { products: Product[]; role: Role; onSave: (product: Product, value
 export function ProductManagement({ products, role, onSave }: Props) {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Product>()
+  const [packagingProduct, setPackagingProduct] = useState<Product>()
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [form] = Form.useForm<Values>()
@@ -96,7 +98,7 @@ export function ProductManagement({ products, role, onSave }: Props) {
     { title: 'Selling price', dataIndex: 'price', key: 'price', render: (price: number, product: Product) => <div>{formatNaira(price)}<br /><Text type="secondary" className="text-xs">{product.minimumSellingPrice === undefined ? 'Fixed price' : `Floor ${formatNaira(product.minimumSellingPrice)}`}</Text></div> },
     { title: 'Stock', dataIndex: 'stock', key: 'stock', render: (stock: number) => <Tag color={stock < 10 ? 'gold' : 'green'}>{stock}</Tag> },
     { title: 'Online', key: 'online', render: (_: unknown, product: Product) => <Tag color={product.onlinePublished ? 'green' : 'default'}>{product.onlinePublished ? 'Published' : 'Draft'}</Tag> },
-    { title: '', key: 'edit', render: (_: unknown, product: Product) => role !== 'cashier' && <Button icon={<EditOutlined />} onClick={() => openEditor(product)}>Edit</Button> },
+    { title: '', key: 'edit', render: (_: unknown, product: Product) => role !== 'cashier' && <Space><Button icon={<InboxOutlined />} onClick={() => setPackagingProduct(product)}>Packs</Button><Button icon={<EditOutlined />} onClick={() => openEditor(product)}>Edit</Button></Space> },
   ]
 
   return <>
@@ -145,5 +147,6 @@ export function ProductManagement({ products, role, onSave }: Props) {
         <Form.Item name="featured" label="Featured on storefront" valuePropName="checked"><Switch checkedChildren="Featured" unCheckedChildren="Regular" /></Form.Item>
       </Form>
     </Modal>
+    <ProductPackagingModal product={packagingProduct} open={Boolean(packagingProduct)} onClose={() => setPackagingProduct(undefined)} />
   </>
 }
