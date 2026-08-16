@@ -364,6 +364,7 @@ function OrganizationDetail({
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [metrics, setMetrics] = useState<Metrics>();
+  const [metricsError, setMetricsError] = useState<string>();
   const [activity, setActivity] = useState<PlatformAudit[]>([]);
   const [profile, setProfile] = useState<OrganizationProfile>();
   const [detailLoading, setDetailLoading] = useState(true);
@@ -416,6 +417,11 @@ function OrganizationDetail({
         setMetrics(
           (metricResult.data?.[0] ?? undefined) as Metrics | undefined,
         );
+      if (!metricResult.error) setMetricsError(undefined);
+      else {
+        setMetrics(undefined);
+        setMetricsError(metricResult.error.message);
+      }
       if (!auditResult.error)
         setActivity((auditResult.data ?? []) as PlatformAudit[]);
       if (!organizationResult.error)
@@ -539,6 +545,7 @@ function OrganizationDetail({
           />
         </Card>
       </div>
+      {metricsError && <Alert className="mb-6" type="warning" showIcon message="Organisation metrics could not load" description="Run the latest platform metrics migration, then refresh this page." />}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]">
         <div className="space-y-6">
           <Card
@@ -972,12 +979,24 @@ export function PlatformApp() {
           )
           .order("monthly_price_kobo"),
       ]);
-    if (organizationResult.error) {
-      api.error(organizationResult.error.message);
+    let organizationRows = organizationResult.data;
+    let organizationError = organizationResult.error;
+    if (organizationError) {
+      // Older installations may not have the overview RPC yet. Platform RLS
+      // allows this equivalent read, so keep the control plane usable.
+      const fallback = await supabase
+        .from("organizations")
+        .select("id,name,slug,status,created_at")
+        .order("created_at", { ascending: false });
+      organizationRows = fallback.data;
+      organizationError = fallback.error;
+    }
+    if (organizationError) {
+      api.error(organizationError.message);
       setLoading(false);
       return;
     }
-    setOrganizations(organizationResult.data as Organization[]);
+    setOrganizations((organizationRows ?? []) as Organization[]);
     setSubscriptions(
       subscriptionResult.error
         ? []

@@ -2,7 +2,7 @@ import {
   AppstoreOutlined, BarChartOutlined, CloudSyncOutlined, DatabaseOutlined,
   DollarOutlined, FileSearchOutlined, FundOutlined, InboxOutlined, LogoutOutlined,
   MoneyCollectOutlined, PieChartOutlined, SettingOutlined, ToolOutlined,
-  MoonOutlined, MoreOutlined, ShoppingCartOutlined, SunOutlined, TeamOutlined, TruckOutlined, UserOutlined, WalletOutlined,
+  MenuOutlined, MoonOutlined, MoreOutlined, ShoppingCartOutlined, SunOutlined, TeamOutlined, TruckOutlined, UserOutlined, WalletOutlined,
 } from '@ant-design/icons'
 import { Avatar, Badge, Button, Dropdown, Layout, Menu, Tag, Tooltip, Typography } from 'antd'
 import { useEffect, useState } from 'react'
@@ -112,10 +112,10 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const mobileItems = [
     { key: 'dashboard', label: 'Home', icon: <PieChartOutlined /> },
     ...(retailEnabled ? [{ key: 'checkout', label: 'Checkout', icon: <ShoppingCartOutlined /> }] : []),
+    { key: 'more', label: 'Menu', icon: <MenuOutlined /> },
     ...(retailEnabled ? [{ key: 'cart', label: 'Cart', icon: <ShoppingCartOutlined />, badge: cartItemCount }] : []),
     ...(servicesEnabled ? [{ key: 'services', label: 'Projects', icon: <ToolOutlined /> }] : []),
     ...(retailEnabled ? [{ key: 'sales', label: 'Sales', icon: <BarChartOutlined /> }] : !servicesEnabled || role === 'cashier' ? [] : [{ key: 'expenses', label: 'Expenses', icon: <MoneyCollectOutlined /> }]),
-    { key: 'more', label: 'More', icon: <MoreOutlined /> },
   ]
 
   return (
@@ -142,8 +142,8 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
           className="!border-0 !bg-transparent"
           items={menuItems}
           onClick={({ key }) => {
-            navigate(key === 'dashboard' ? '/' : key === 'audit' ? '/settings#audit' : `/${key}`)
             setCollapsed(true)
+            navigate(key === 'dashboard' ? '/' : key === 'audit' ? '/settings#audit' : `/${key}`)
           }}
         />
       </Sider>

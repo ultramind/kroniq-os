@@ -26,6 +26,7 @@ export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefres
   const today = new Date().toISOString().slice(0, 10)
   async function recordPayment(values: { amount: number; paidAt: string }) {
     if (!selectedSale || !supabase) return
+    if (values.amount > balance(selectedSale)) { messageApi.error('Payment cannot be more than the remaining balance.'); return }
     setSaving(true)
     const { error } = await supabase.rpc('record_credit_payment', { p_sale_id: selectedSale.id, p_amount_kobo: Math.round(values.amount * 100), p_paid_at: values.paidAt })
     setSaving(false)

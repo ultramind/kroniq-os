@@ -5,6 +5,7 @@ import { formatNaira } from '../../lib/currency'
 import { supabase } from '../../supabase'
 import type { Product, Role } from '../../types'
 import { ProductPackagingModal } from './ProductPackagingModal'
+import { CurrencyInput } from '../../components/CurrencyInput'
 
 const { Text } = Typography
 const MAX_IMAGES = 2
@@ -132,10 +133,10 @@ export function ProductManagement({ products, role, onSave }: Props) {
           </div>
         }}</Form.Item>
         <div className="grid grid-cols-2 gap-4">
-          <Form.Item name="costPrice" label="Cost price (₦)" rules={[{ required: true }]}><InputNumber min={0} precision={2} size="large" className="w-full" /></Form.Item>
-          <Form.Item name="price" label="Selling price (₦)" rules={[{ required: true }]}><InputNumber min={0} precision={2} size="large" className="w-full" /></Form.Item>
+          <Form.Item name="costPrice" label="Cost price (₦)" rules={[{ required: true }]}><CurrencyInput min={0} precision={2} size="large" className="w-full" /></Form.Item>
+          <Form.Item name="price" label="Selling price (₦)" rules={[{ required: true }]}><CurrencyInput min={0} precision={2} size="large" className="w-full" /></Form.Item>
         </div>
-        <Form.Item name="minimumSellingPrice" label="Cashier price floor (₦)" extra="Optional. When set, cashiers can agree a lower price down to this amount. Managers/admins can go below it with a reason."><InputNumber min={0} precision={2} size="large" className="w-full" /></Form.Item>
+        <Form.Item name="minimumSellingPrice" label="Cashier price floor (₦)" extra="Optional. When set, cashiers can agree a lower price down to this amount. Managers/admins can go below it with a reason."><CurrencyInput min={0} precision={2} size="large" className="w-full" /></Form.Item>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item name="onlinePublished" label="Online storefront">
             <Radio.Group optionType="button" buttonStyle="solid" options={[{ label: 'Draft', value: false }, { label: 'Published', value: true }]} />

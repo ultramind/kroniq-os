@@ -3,6 +3,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useEffect, useState } from 'react'
 import type { InventoryLocation, Product } from '../../types'
 import { supabase } from '../../supabase'
+import { CurrencyInput } from '../../components/CurrencyInput'
 
 type Values = {
   productId: string
@@ -106,21 +107,21 @@ export function DeliveryModal({ open, products, saving, onClose, onSave }: Props
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Form.Item name="quantity" label={`Quantity received (${receivedUnitLabel})`} rules={[{ required: true }]}><InputNumber min={1} precision={0} className="w-full" /></Form.Item>
-        <Form.Item name="unitCost" label={`Cost per ${receivedUnitLabel} (₦)`} rules={[{ required: true }]}><InputNumber min={0} precision={2} className="w-full" /></Form.Item>
+        <Form.Item name="unitCost" label={`Cost per ${receivedUnitLabel} (₦)`} rules={[{ required: true }]}><CurrencyInput min={0} precision={2} className="w-full" /></Form.Item>
       </div>
 
       <div className="mb-5 border-y border-slate-200 py-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Typography.Text type="secondary" className="mb-1 block text-sm">Current selling price</Typography.Text>
-            <InputNumber disabled value={selectedProduct?.price} prefix="₦" precision={2} className="w-full" />
+            <CurrencyInput disabled value={selectedProduct?.price} precision={2} className="w-full" />
           </div>
           <div className="flex flex-col justify-end">
             <Form.Item name="updateSellingPrice" valuePropName="checked" className="!mb-1"><Switch disabled={!selectedProduct} checkedChildren="Update price" unCheckedChildren="Keep price" /></Form.Item>
             <Typography.Text type="secondary" className="text-[10px] leading-[1.3]">Choose whether this delivery should change the selling price.</Typography.Text>
           </div>
         </div>
-        {updateSellingPrice && <Form.Item name="sellingPrice" label="New selling price (₦)" className="!mb-0" rules={[{ required: true, message: 'Enter the new selling price.' }]} extra="This change is recorded with the delivery."><InputNumber min={0} precision={2} className="w-full" /></Form.Item>}
+        {updateSellingPrice && <Form.Item name="sellingPrice" label="New selling price (₦)" className="!mb-0" rules={[{ required: true, message: 'Enter the new selling price.' }]} extra="This change is recorded with the delivery."><CurrencyInput min={0} precision={2} className="w-full" /></Form.Item>}
       </div>
       <Form.Item name="receivedAt" label="Received date" rules={[{ required: true, message: 'Select when this stock was received.' }]} extra="Use the supplier’s delivery date for accurate stock records.">
         <DatePicker className="w-full" format="DD MMM YYYY" />
