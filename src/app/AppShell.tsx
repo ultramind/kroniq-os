@@ -139,10 +139,15 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
           selectedKeys={[activeKey]}
           openKeys={openKeys}
           onOpenChange={setOpenKeys}
+          onClickCapture={(event) => {
+            if ((event.target as HTMLElement).closest('.ant-menu-item')) {
+              setOpenKeys([])
+              setCollapsed(true)
+            }
+          }}
           className="!border-0 !bg-transparent"
           items={menuItems}
           onClick={({ key }) => {
-            setCollapsed(true)
             navigate(key === 'dashboard' ? '/' : key === 'audit' ? '/settings#audit' : `/${key}`)
           }}
         />

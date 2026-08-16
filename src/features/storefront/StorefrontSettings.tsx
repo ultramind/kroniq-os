@@ -1,4 +1,4 @@
-import { DeleteOutlined, UploadOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Form, Image, Input, Switch, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabase'
@@ -122,6 +122,7 @@ export function StorefrontSettings() {
     <p className="text-sm text-slate-500">Create a branded public catalogue. Only products marked as published online will appear.</p>
     <Form form={form} layout="vertical" initialValues={{ enabled: false, primaryColor: '#0B1121', heroImageUrls: [] }} onFinish={(values) => void save(values)} className="mt-5">
       <Form.Item name="slug" label="Public store URL" extra="Lowercase letters, numbers, and hyphens only." rules={[{ required: true, pattern: /^[a-z0-9-]{3,80}$/ }]}><Input addonBefore="/shop/" /></Form.Item>
+      <Form.Item shouldUpdate noStyle>{() => { const slug = String(form.getFieldValue('slug') ?? '').trim(); const publicUrl = slug ? new URL(`/shop/${slug}`, window.location.origin).toString() : ''; return <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center"><Input value={publicUrl} readOnly placeholder="Your full public store link will appear here" /><Button className="!h-8 shrink-0" icon={<CopyOutlined />} disabled={!publicUrl} onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => api.success('Public store URL copied.')).catch(() => api.error('Could not copy the URL. Please copy it manually.'))}>Copy URL</Button></div> }}</Form.Item>
       <Form.Item name="headline" label="Headline"><Input placeholder="Fresh groceries, delivered with care." /></Form.Item>
       <Form.Item name="description" label="Store description"><Input.TextArea rows={3} /></Form.Item>
       <div className="grid gap-4 sm:grid-cols-2"><Form.Item name="vision" label="Vision statement"><Input.TextArea rows={3} placeholder="Where we are going." /></Form.Item><Form.Item name="mission" label="Mission statement"><Input.TextArea rows={3} placeholder="How we serve customers." /></Form.Item></div>

@@ -12,8 +12,10 @@ import { clearLocalPosDataForNewTenant } from '../../db'
 import { PlatformAccessDenied, PlatformApp } from '../platform/PlatformApp'
 import { BillingPanel } from '../billing/BillingPanel'
 import { MarketingSite } from '../marketing/MarketingSite'
+import { useTheme } from '../../app/theme'
 
 export function AuthGate() {
+  const { mode } = useTheme()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const platformRoute = pathname.startsWith('/platform')
@@ -48,7 +50,7 @@ export function AuthGate() {
     const { data: listener } = client.auth.onAuthStateChange(() => void load())
     return () => listener.subscription.unsubscribe()
   }, [platformRoute])
-  if (state.loading) return <main className="kroniq-loader grid min-h-screen place-items-center overflow-hidden p-6"><div className="relative w-full max-w-sm text-center"><div className="kroniq-loader-orb absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2" /><Typography.Title level={3} className="relative !mb-2 !text-[#0B1121]">KroniqOS</Typography.Title><Typography.Text type="secondary" className="relative">Preparing your workspace</Typography.Text><div className="relative mx-auto mt-7 h-px w-44 overflow-hidden bg-slate-200"><span className="kroniq-loader-line block h-full w-1/2 bg-[#0B1121]" /></div><div className="relative mt-4 flex items-center justify-center gap-2 text-[11px] text-slate-500"><CloudSyncOutlined className="kroniq-loader-spin" />Checking your secure workspace</div></div></main>
+  if (state.loading) return <main className={`kroniq-loader kroniq-loader--${mode} grid min-h-screen place-items-center overflow-hidden p-6`}><div className="relative w-full max-w-sm text-center"><div className="kroniq-loader-orb absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2" /><Typography.Title level={3} className="kroniq-loader-title relative !mb-2">KroniqOS</Typography.Title><Typography.Text className="kroniq-loader-subtitle relative">Preparing your workspace</Typography.Text><div className="kroniq-loader-track relative mx-auto mt-7 h-px w-44 overflow-hidden"><span className="kroniq-loader-line block h-full w-1/2" /></div><div className="kroniq-loader-status relative mt-4 flex items-center justify-center gap-2 text-[11px]"><CloudSyncOutlined className="kroniq-loader-spin" />Checking your secure workspace</div></div></main>
   if (state.unauthenticated && pathname === '/register') return <CompanyRegistration onBack={() => navigate('/login')} onSignedIn={() => window.location.reload()} />
   if (state.unauthenticated && pathname === '/login') return <Login onRegister={() => navigate('/register')} />
   if (state.unauthenticated && publicMarketingRoute) return <MarketingSite />

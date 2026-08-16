@@ -120,7 +120,19 @@ html:has([data-theme='dark']), [data-theme='dark'] body { background: var(--app-
 .platform-menu-trigger { color: var(--text) !important; }
 .platform-menu-dismiss { position: fixed; inset: 0; z-index: 25; border: 0; background: rgb(11 17 33 / 18%); backdrop-filter: blur(1px); }
 .kroniq-loader { background: radial-gradient(circle at 50% 44%, #f1f5f9 0, #fafafa 38%, #fff 100%); }
+.kroniq-loader-title { color: #0b1121 !important; }
+.kroniq-loader-subtitle, .kroniq-loader-status { color: #64748b; }
+.kroniq-loader-track { background: #e2e8f0; }
+.kroniq-loader-line { background: #0b1121; }
 .kroniq-loader-orb { border-radius: 999px; background: radial-gradient(circle, rgb(11 17 33 / 9%), transparent 68%); filter: blur(4px); animation: kroniq-loader-breathe 1.8s ease-in-out infinite; }
+.kroniq-loader--dark { background: radial-gradient(circle at 50% 44%, #172033 0, #09090b 46%, #050506 100%); }
+.kroniq-loader--dark .kroniq-loader-title { color: #f8fafc !important; }
+.kroniq-loader--dark .kroniq-loader-subtitle, .kroniq-loader--dark .kroniq-loader-status { color: #a1a1aa; }
+.kroniq-loader--dark .kroniq-loader-track { background: #27272a; }
+.kroniq-loader--dark .kroniq-loader-line { background: #e2e8f0; }
+.kroniq-loader--dark .kroniq-loader-orb { background: radial-gradient(circle, rgb(148 163 184 / 18%), transparent 68%); }
+.checkout-controls { background: #f8fafc; border-color: #e2e8f0; }
+[data-theme='dark'] .checkout-controls { background: #16171a !important; border-color: #303036 !important; }
 .kroniq-loader-line { animation: kroniq-loader-progress 1.25s cubic-bezier(.65, 0, .35, 1) infinite; }
 .kroniq-loader-spin { animation: kroniq-loader-spin 1.2s linear infinite; }
 @keyframes kroniq-loader-breathe { 50% { transform: translate(-50%, -50%) scale(1.12); opacity: .55; } }
@@ -169,6 +181,16 @@ html:has([data-theme='dark']), [data-theme='dark'] body { background: var(--app-
   .platform-sider.is-open { transform: translateX(0); }
   .platform-content-shell { margin-left: 0 !important; width: 100% !important; }
   .platform-shell .app-header { left: 0 !important; }
+  .platform-dashboard .ant-card-head { min-height: 46px; padding-inline: 14px; }
+  .platform-dashboard .ant-card-body { padding: 14px; }
+  .platform-dashboard .platform-stat-card .ant-statistic-title { min-height: 34px; font-size: 11px; line-height: 1.35; }
+  .platform-dashboard .platform-stat-card .ant-statistic-content { font-size: 22px; }
+  .platform-dashboard .ant-list-item { align-items: center; gap: 8px; }
+  .dashboard-table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-inline: contain; }
+  .dashboard-table-scroll .ant-table { min-width: 520px; }
+  .dashboard-table-scroll .ant-table-cell { white-space: nowrap; }
+  .payment-summary-table .ant-table-content > table { min-width: 0 !important; width: 100% !important; }
+  .payment-summary-table .ant-table-cell { white-space: normal; }
 }
 
 @media print {
