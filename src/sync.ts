@@ -74,7 +74,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
       p_discount_kobo: Math.round((sale.discount ?? 0) * 100),
       p_payment_method: sale.paymentMethod,
       p_sold_at: sale.createdAt,
-      p_items: resolved.items.map((item) => ({ product_id: item.id, quantity: item.quantity, unit_price_kobo: Math.round(item.price * 100) })),
+      p_items: resolved.items.map((item) => ({ product_id: item.id, quantity: item.quantity, unit_price_kobo: Math.round(item.price * 100), price_override_reason: item.priceOverrideReason ?? null })),
       p_credit: sale.paymentMethod === 'credit' ? { customer_name: sale.creditCustomerName, customer_phone: sale.creditCustomerPhone, due_date: sale.creditDueDate, initial_payment_kobo: Math.round((sale.creditInitialPayment ?? 0) * 100) } : null,
     })
     if (saleError) return { synced, error: `Sale sync: ${saleError.message}` }
@@ -94,12 +94,12 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
 /** Keeps the checkout catalogue available locally after an online refresh. */
 export async function pullProducts(): Promise<{ loaded: number; error?: string }> {
   if (!supabase || !navigator.onLine) return { loaded: 0 }
-  const response = await supabase.from('products').select('id, name, sku, price_kobo, cost_price_kobo, stock_quantity, low_stock_threshold, description, image_url, image_urls, online_published, is_featured, categories(name)').eq('active', true).order('name')
+  const response = await supabase.from('products').select('id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, description, image_url, image_urls, online_published, is_featured, categories(name)').eq('active', true).order('name')
   let data: any[] | null = response.data
   let error = response.error
   // Allow checkout to keep refreshing during the rollout if this client reaches a database
   // before the optional two-image migration has been applied.
-  if (error?.code === '42703' && (error.message.includes('image_urls') || error.message.includes('is_featured'))) {
+  if (error?.code === '42703' && (error.message.includes('image_urls') || error.message.includes('is_featured') || error.message.includes('minimum_selling_price_kobo'))) {
     const legacy = await supabase.from('products').select('id, name, sku, price_kobo, cost_price_kobo, stock_quantity, low_stock_threshold, description, image_url, online_published, categories(name)').eq('active', true).order('name')
     data = legacy.data
     error = legacy.error
@@ -107,7 +107,7 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
   if (error) return { loaded: 0, error: error.message }
   const products = (data ?? []).map((row) => {
     const category = Array.isArray(row.categories) ? row.categories[0] : row.categories
-    return { id: row.id, name: row.name, sku: row.sku, price: row.price_kobo / 100, costPrice: (row.cost_price_kobo ?? 0) / 100, stock: row.stock_quantity, lowStockThreshold: row.low_stock_threshold ?? 10, category: category?.name ?? 'Uncategorised', description: row.description ?? undefined, imageUrl: row.image_url ?? undefined, imageUrls: row.image_urls?.length ? row.image_urls : row.image_url ? [row.image_url] : [], onlinePublished: row.online_published ?? false, featured: row.is_featured ?? false }
+    return { id: row.id, name: row.name, sku: row.sku, price: row.price_kobo / 100, costPrice: (row.cost_price_kobo ?? 0) / 100, minimumSellingPrice: row.minimum_selling_price_kobo === null || row.minimum_selling_price_kobo === undefined ? undefined : row.minimum_selling_price_kobo / 100, stock: row.stock_quantity, lowStockThreshold: row.low_stock_threshold ?? 10, category: category?.name ?? 'Uncategorised', description: row.description ?? undefined, imageUrl: row.image_url ?? undefined, imageUrls: row.image_urls?.length ? row.image_urls : row.image_url ? [row.image_url] : [], onlinePublished: row.online_published ?? false, featured: row.is_featured ?? false }
   })
   await db.transaction('rw', db.products, async () => { await db.products.clear(); await db.products.bulkPut(products) })
   return { loaded: products.length }
@@ -118,7 +118,7 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
   if (!supabase || !navigator.onLine) return { loaded: 0 }
   const { data, error } = await supabase
     .from('sales')
-    .select('id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, cost_price_kobo, products(name))')
+    .select('id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, products(name))')
     .order('sold_at', { ascending: false })
     .limit(500)
   if (error) return { loaded: 0, error: error.message }
@@ -147,7 +147,7 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
       })
       const items = (row.sale_items ?? []).map((item: any) => {
         const product = Array.isArray(item.products) ? item.products[0] : item.products
-        return { id: item.id, saleId: row.id, productId: item.product_id, productName: product?.name ?? 'Product', quantity: item.quantity, unitPrice: item.unit_price_kobo / 100, costPrice: (item.cost_price_kobo ?? 0) / 100 }
+        return { id: item.id, saleId: row.id, productId: item.product_id, productName: product?.name ?? 'Product', quantity: item.quantity, unitPrice: item.unit_price_kobo / 100, listPrice: item.list_price_kobo === null || item.list_price_kobo === undefined ? undefined : item.list_price_kobo / 100, priceOverrideReason: item.price_override_reason ?? undefined, costPrice: (item.cost_price_kobo ?? 0) / 100 }
       })
       if (items.length) {
         await db.saleItems.where('saleId').equals(row.id).delete()

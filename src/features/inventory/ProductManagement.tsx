@@ -12,6 +12,7 @@ type Values = {
   sku: string
   price: number
   costPrice: number
+  minimumSellingPrice?: number
   active: boolean
   description?: string
   imageUrl?: string
@@ -81,6 +82,7 @@ export function ProductManagement({ products, role, onSave }: Props) {
       sku: product.sku,
       price: product.price,
       costPrice: product.costPrice,
+      minimumSellingPrice: product.minimumSellingPrice,
       active: product.active !== false,
       description: product.description,
       imageUrls: product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : [],
@@ -91,7 +93,7 @@ export function ProductManagement({ products, role, onSave }: Props) {
 
   const columns = [
     { title: 'Product', dataIndex: 'name', key: 'name', render: (name: string, product: Product) => <div><Text strong>{name}</Text><br /><Text type="secondary" className="text-xs">SKU {product.sku} · {product.category}</Text></div> },
-    { title: 'Selling price', dataIndex: 'price', key: 'price', render: (price: number) => formatNaira(price) },
+    { title: 'Selling price', dataIndex: 'price', key: 'price', render: (price: number, product: Product) => <div>{formatNaira(price)}<br /><Text type="secondary" className="text-xs">{product.minimumSellingPrice === undefined ? 'Fixed price' : `Floor ${formatNaira(product.minimumSellingPrice)}`}</Text></div> },
     { title: 'Stock', dataIndex: 'stock', key: 'stock', render: (stock: number) => <Tag color={stock < 10 ? 'gold' : 'green'}>{stock}</Tag> },
     { title: 'Online', key: 'online', render: (_: unknown, product: Product) => <Tag color={product.onlinePublished ? 'green' : 'default'}>{product.onlinePublished ? 'Published' : 'Draft'}</Tag> },
     { title: '', key: 'edit', render: (_: unknown, product: Product) => role !== 'cashier' && <Button icon={<EditOutlined />} onClick={() => openEditor(product)}>Edit</Button> },
@@ -131,6 +133,7 @@ export function ProductManagement({ products, role, onSave }: Props) {
           <Form.Item name="costPrice" label="Cost price (₦)" rules={[{ required: true }]}><InputNumber min={0} precision={2} size="large" className="w-full" /></Form.Item>
           <Form.Item name="price" label="Selling price (₦)" rules={[{ required: true }]}><InputNumber min={0} precision={2} size="large" className="w-full" /></Form.Item>
         </div>
+        <Form.Item name="minimumSellingPrice" label="Cashier price floor (₦)" extra="Optional. When set, cashiers can agree a lower price down to this amount. Managers/admins can go below it with a reason."><InputNumber min={0} precision={2} size="large" className="w-full" /></Form.Item>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Form.Item name="onlinePublished" label="Online storefront">
             <Radio.Group optionType="button" buttonStyle="solid" options={[{ label: 'Draft', value: false }, { label: 'Published', value: true }]} />

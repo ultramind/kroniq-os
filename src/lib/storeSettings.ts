@@ -7,6 +7,7 @@ export type StoreSettings = {
   lowStock: number
   payments: string[]
   currencyCode: string
+  flexiblePricingEnabled: boolean
 }
 
 const key = 'naira-pos-settings'
@@ -16,6 +17,7 @@ export const defaultStoreSettings: StoreSettings = {
   lowStock: 10,
   payments: ['cash', 'card', 'transfer', 'credit'],
   currencyCode: 'NGN',
+  flexiblePricingEnabled: true,
 }
 
 export function getStoreSettings(): StoreSettings {

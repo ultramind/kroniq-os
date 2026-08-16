@@ -4,7 +4,7 @@ import { formatNaira } from '../lib/currency'
 import { ProductManagement } from '../features/inventory/ProductManagement'
 import type { Product, Role } from '../types'
 
-export function ProductsPage({ products, role, onAddProduct, onSaveProduct }: { products: Product[]; role: Role; onAddProduct: () => void; onSaveProduct: (product: Product, values: { name: string; sku: string; price: number; costPrice: number; active: boolean; description?: string; imageUrl?: string; imageUrls?: string[]; onlinePublished?: boolean; featured?: boolean }) => Promise<void> }) {
+export function ProductsPage({ products, role, onAddProduct, onSaveProduct }: { products: Product[]; role: Role; onAddProduct: () => void; onSaveProduct: (product: Product, values: { name: string; sku: string; price: number; costPrice: number; minimumSellingPrice?: number; active: boolean; description?: string; imageUrl?: string; imageUrls?: string[]; onlinePublished?: boolean; featured?: boolean }) => Promise<void> }) {
   const active = products.filter((product) => product.active !== false)
   const lowStock = active.filter((product) => product.stock <= (product.lowStockThreshold ?? 10)).length
   const sellingValue = active.reduce((sum, product) => sum + product.stock * product.price, 0)

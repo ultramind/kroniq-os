@@ -19,6 +19,7 @@ type Props = {
   cart: CartItem[]
   total: number
   role?: import('../types').Role
+  flexiblePricingEnabled?: boolean
   discountPercent?: number
   onDiscountChange?: (value: number) => void
   paymentMethod: PaymentMethod
@@ -33,7 +34,7 @@ type Props = {
   onHold?: () => void
 }
 
-export function CheckoutPage({ products, search, cart, total, role = 'cashier', discountPercent = 0, onDiscountChange = () => undefined, paymentMethod, onSearchChange, onBarcodeLookup, onQuantityChange, onUnitPriceChange, onPaymentChange, onCheckout, onHistoricalCheckout, historicalSaving, onHold }: Props) {
+export function CheckoutPage({ products, search, cart, total, role = 'cashier', flexiblePricingEnabled = true, discountPercent = 0, onDiscountChange = () => undefined, paymentMethod, onSearchChange, onBarcodeLookup, onQuantityChange, onUnitPriceChange, onPaymentChange, onCheckout, onHistoricalCheckout, historicalSaving, onHold }: Props) {
   const state = usePosStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -121,5 +122,5 @@ export function CheckoutPage({ products, search, cart, total, role = 'cashier', 
     <Drawer title={<span className="flex items-center gap-2"><ShoppingCartOutlined /> Current sale <span className="text-sm font-normal text-slate-500">({cartItemCount} items)</span></span>} placement="right" open={cartDrawerOpen} onClose={() => { setCartDrawerOpen(false); navigate('/checkout', { replace: true }) }} width="min(100vw, 430px)" className="lg:hidden" bodyStyle={{ padding: 16 }}>
     {cartPanel}
   </Drawer>
-  <QuantityKeypadModal product={quantityProduct} maxQuantity={Math.max(0, (quantityProduct?.stock ?? 0) - quantityAlreadyInCart)} open={Boolean(quantityProduct)} onClose={() => setQuantityProduct(undefined)} onConfirm={(quantity) => { if (quantityProduct) state.addToCartQuantity(quantityProduct, quantity) }} /></>
+  <QuantityKeypadModal product={quantityProduct} maxQuantity={Math.max(0, (quantityProduct?.stock ?? 0) - quantityAlreadyInCart)} role={role} flexiblePricingEnabled={flexiblePricingEnabled} open={Boolean(quantityProduct)} onClose={() => setQuantityProduct(undefined)} onConfirm={(quantity, agreedPrice, reason) => { if (quantityProduct) state.addToCartQuantity(quantityProduct, quantity, agreedPrice, reason) }} /></>
 }

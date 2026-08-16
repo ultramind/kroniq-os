@@ -1,8 +1,10 @@
 import { MinusOutlined, MonitorOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Checkbox, DatePicker, Empty, Input, InputNumber, Modal, Space, Statistic, Tooltip, Typography } from 'antd'
+import { Alert, Button, Card, Checkbox, DatePicker, Empty, Input, InputNumber, Modal, Select, Space, Statistic, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
+import { db } from '../../db'
 import { formatNaira } from '../../lib/currency'
+import { supabase } from '../../supabase'
 import type { CartItem, PaymentMethod, Role } from '../../types'
 
 const { Text } = Typography
@@ -13,6 +15,8 @@ const methods: { id: PaymentMethod; label: string }[] = [
   { id: 'transfer', label: 'Transfer' },
   { id: 'credit', label: 'Credit' },
 ]
+
+type Creditor = { key: string; name: string; phone: string }
 
 type Props = {
   cart: CartItem[]
@@ -57,6 +61,8 @@ export function CartPanel({
   const [creditInitialPayment, setCreditInitialPayment] = useState<number | null>(null)
   const [creditModalOpen, setCreditModalOpen] = useState(false)
   const [creditError, setCreditError] = useState('')
+  const [creditors, setCreditors] = useState<Creditor[]>([])
+  const [loadingCreditors, setLoadingCreditors] = useState(false)
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10))
   const [deductStock, setDeductStock] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
@@ -65,6 +71,15 @@ export function CartPanel({
   const change = cashReceived === null ? null : Math.max(0, cashReceived - total)
   const cashIsInsufficient = paymentMethod === 'cash' && (cashReceived === null || cashReceived < total)
   const creditDetailsMissing = paymentMethod === 'credit' && (!creditCustomerName.trim() || !creditCustomerPhone.trim())
+
+  function clearCreditDetails() {
+    setCreditCustomerName('')
+    setCreditCustomerPhone('')
+    setCreditDueDate('')
+    setCreditInitialPayment(null)
+    setCreditError('')
+    setCreditModalOpen(false)
+  }
 
   useEffect(() => {
     if (paymentMethod === 'cash' && !cashEntryManual) setCashReceived(total)
@@ -75,15 +90,39 @@ export function CartPanel({
     if (cart.length !== 0) return
     setCashReceived(null)
     setCashEntryManual(false)
-    setCreditCustomerName('')
-    setCreditCustomerPhone('')
-    setCreditDueDate('')
-    setCreditInitialPayment(null)
-    setCreditError('')
-    setCreditModalOpen(false)
+    clearCreditDetails()
     setSaleDate(today)
     setDeductStock(false)
   }, [cart.length])
+
+  useEffect(() => {
+    if (!creditModalOpen) return
+
+    void (async () => {
+      setLoadingCreditors(true)
+      try {
+        const localSales = await db.sales.toArray()
+        const known: Creditor[] = localSales
+          .filter((sale) => sale.paymentMethod === 'credit' && sale.creditCustomerName && sale.creditCustomerPhone)
+          .map((sale) => ({ key: `credit:${sale.creditCustomerName!.trim().toLowerCase()}|${sale.creditCustomerPhone!.trim()}`, name: sale.creditCustomerName!.trim(), phone: sale.creditCustomerPhone!.trim() }))
+
+        if (supabase && navigator.onLine) {
+          const { data: { user } } = await supabase.auth.getUser()
+          const { data: profile } = user ? await supabase.from('profiles').select('store_id').eq('id', user.id).maybeSingle() : { data: null }
+          if (profile?.store_id) {
+            const { data: customers } = await supabase.from('customers').select('full_name,phone').eq('store_id', profile.store_id).not('phone', 'is', null).order('full_name')
+            known.push(...(customers ?? []).filter((customer) => customer.full_name && customer.phone).map((customer) => ({ key: `customer:${customer.full_name.trim().toLowerCase()}|${customer.phone.trim()}`, name: customer.full_name.trim(), phone: customer.phone.trim() })))
+          }
+        }
+
+        const unique = new Map<string, Creditor>()
+        known.forEach((creditor) => unique.set(`${creditor.name.toLowerCase()}|${creditor.phone}`, creditor))
+        setCreditors([...unique.values()].sort((a, b) => a.name.localeCompare(b.name)))
+      } finally {
+        setLoadingCreditors(false)
+      }
+    })()
+  }, [creditModalOpen])
 
   function selectPaymentMethod(method: PaymentMethod) {
     onMethodChange(method)
@@ -110,7 +149,7 @@ export function CartPanel({
         <div className="max-h-[360px] overflow-y-auto">
           {cart.map((item) => (
             <div key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-slate-100 py-4">
-              <div><Text strong>{item.name}</Text><br />{isHistorical ? <div className="mt-2"><Text type="secondary" className="mb-1 block text-xs">Unit price</Text><InputNumber aria-label={`Unit price for ${item.name}`} min={0} precision={2} prefix="₦" size="middle" className="historical-unit-price" value={item.price} onChange={(value) => onUnitPriceChange(item.id, typeof value === 'number' ? value : item.price)} /></div> : <Text type="secondary" className="text-xs">{formatNaira(item.price)} each</Text>}</div>
+              <div><Text strong>{item.name}</Text><br />{isHistorical ? <div className="mt-2"><Text type="secondary" className="mb-1 block text-xs">Unit price</Text><InputNumber aria-label={`Unit price for ${item.name}`} min={0} precision={2} prefix="₦" size="middle" className="historical-unit-price" value={item.price} onChange={(value) => onUnitPriceChange(item.id, typeof value === 'number' ? value : item.price)} /></div> : <div><Text type="secondary" className="text-xs">{formatNaira(item.price)} each</Text>{item.listPrice !== undefined && item.listPrice !== item.price && <Text className="ml-2 text-xs text-amber-700">Agreed from {formatNaira(item.listPrice)}</Text>}</div>}</div>
               <Space.Compact>
                 <Button size="middle" className="touch-target" icon={<MinusOutlined />} onClick={() => onQuantityChange(item.id, item.quantity - 1)} />
                 <Button size="middle" className="touch-target" disabled>{item.quantity}</Button>
@@ -148,10 +187,10 @@ export function CartPanel({
 
       {paymentMethod === 'credit' && <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2"><div><Text strong className="text-red-800">Customer credit</Text><Text className="block text-xs text-red-700">{creditCustomerName ? `${creditCustomerName} · outstanding ${formatNaira(total - (creditInitialPayment ?? 0))}` : 'Customer details required'}</Text></div><Button danger size="small" onClick={() => setCreditModalOpen(true)}>Edit details</Button></div>}
 
-      <Button type="primary" size="large" block loading={historicalSaving} className="touch-checkout touch-target whitespace-normal px-2 text-base font-bold leading-tight active:scale-[0.98]" disabled={!cart.length || cashIsInsufficient || creditDetailsMissing || (isHistorical && !onHistoricalCheckout)} onClick={() => { const credit = paymentMethod === 'credit' ? { customerName: creditCustomerName.trim(), customerPhone: creditCustomerPhone.trim(), dueDate: creditDueDate || undefined, initialPayment: creditInitialPayment ?? 0 } : undefined; if (isHistorical) onHistoricalCheckout?.(credit, saleDate, deductStock); else onCheckout(credit) }}>{isHistorical ? `${deductStock ? 'Record and deduct stock' : 'Record historical sale'} · ${formatNaira(total)}` : `Complete sale · ${formatNaira(total)}`}</Button>
+      <Button type="primary" size="large" block loading={historicalSaving} className="touch-checkout touch-target whitespace-normal px-2 text-base font-bold leading-tight active:scale-[0.98]" disabled={!cart.length || cashIsInsufficient || creditDetailsMissing || (isHistorical && !onHistoricalCheckout)} onClick={() => { const credit = paymentMethod === 'credit' ? { customerName: creditCustomerName.trim(), customerPhone: creditCustomerPhone.trim(), dueDate: creditDueDate || undefined, initialPayment: creditInitialPayment ?? 0 } : undefined; if (isHistorical) onHistoricalCheckout?.(credit, saleDate, deductStock); else onCheckout(credit); if (paymentMethod === 'credit') clearCreditDetails() }}>{isHistorical ? `${deductStock ? 'Record and deduct stock' : 'Record historical sale'} · ${formatNaira(total)}` : `Complete sale · ${formatNaira(total)}`}</Button>
       {children && <div className="mt-5">{children}</div>}
       <Modal open={creditModalOpen} title="Customer credit details" okText="Use credit details" onOk={confirmCreditDetails} onCancel={() => { setCreditModalOpen(false); if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) onMethodChange('cash') }} destroyOnClose={false}>
-        <div className="space-y-4 pt-2">{creditError && <Alert type="error" showIcon message={creditError} />}<div><label className="mb-1 block text-sm font-medium text-slate-700">Customer full name</label><Input value={creditCustomerName} onChange={(event) => setCreditCustomerName(event.target.value)} placeholder="Customer full name" size="large" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Phone number</label><Input value={creditCustomerPhone} onChange={(event) => setCreditCustomerPhone(event.target.value)} placeholder="Phone number" inputMode="tel" size="large" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Initial payment <span className="font-normal text-slate-400">(optional)</span></label><InputNumber value={creditInitialPayment} onChange={(value) => setCreditInitialPayment(typeof value === 'number' ? value : null)} min={0} max={total} precision={2} prefix="₦" placeholder="₦0.00" size="large" className="w-full" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Expected payment date <span className="font-normal text-slate-400">(optional)</span></label><DatePicker value={creditDueDate ? dayjs(creditDueDate) : null} onChange={(value) => setCreditDueDate(value?.format('YYYY-MM-DD') ?? '')} format="DD MMM YYYY" size="large" className="w-full" /></div></div>
+        <div className="space-y-4 pt-2">{creditError && <Alert type="error" showIcon message={creditError} />}<div><label className="mb-1 block text-sm font-medium text-slate-700">Existing creditor <span className="font-normal text-slate-400">(optional)</span></label><Select showSearch allowClear loading={loadingCreditors} optionFilterProp="label" placeholder="Search previous creditor or client" size="large" className="w-full" options={creditors.map((creditor) => ({ value: creditor.key, label: `${creditor.name} · ${creditor.phone}` }))} onChange={(value) => { const creditor = creditors.find((item) => item.key === value); if (creditor) { setCreditCustomerName(creditor.name); setCreditCustomerPhone(creditor.phone); setCreditError('') } }} /></div><div className="border-t border-slate-200 pt-4"><Text type="secondary" className="mb-3 block text-xs">Or add a new creditor</Text><div className="space-y-4"><div><label className="mb-1 block text-sm font-medium text-slate-700">Customer full name</label><Input value={creditCustomerName} onChange={(event) => setCreditCustomerName(event.target.value)} placeholder="Customer full name" size="large" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Phone number</label><Input value={creditCustomerPhone} onChange={(event) => setCreditCustomerPhone(event.target.value)} placeholder="Phone number" inputMode="tel" size="large" /></div></div></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Initial payment <span className="font-normal text-slate-400">(optional)</span></label><InputNumber value={creditInitialPayment} onChange={(value) => setCreditInitialPayment(typeof value === 'number' ? value : null)} min={0} max={total} precision={2} prefix="₦" placeholder="₦0.00" size="large" className="w-full" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Expected payment date <span className="font-normal text-slate-400">(optional)</span></label><DatePicker value={creditDueDate ? dayjs(creditDueDate) : null} onChange={(value) => setCreditDueDate(value?.format('YYYY-MM-DD') ?? '')} format="DD MMM YYYY" size="large" className="w-full" /></div></div>
       </Modal>
     </Card>
   )

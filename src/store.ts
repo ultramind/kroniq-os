@@ -13,7 +13,7 @@ type PosState = {
   setDiscountPercent: (value: number) => void
   replaceCart: (cart: CartItem[]) => void
   addToCart: (product: Product) => void
-  addToCartQuantity: (product: Product, quantity: number) => void
+  addToCartQuantity: (product: Product, quantity: number, agreedPrice?: number, priceOverrideReason?: string) => void
   updateQuantity: (id: string, quantity: number) => void
   updateUnitPrice: (id: string, price: number) => void
   clearCart: () => void
@@ -35,12 +35,12 @@ export const usePosStore = create<PosState>((set) => ({
     if (item) return { cart: state.cart.map((cartItem) => cartItem.id === product.id ? { ...cartItem, quantity: Math.min(cartItem.quantity + 1, product.stock) } : cartItem) }
     return product.stock > 0 ? { cart: [...state.cart, { ...product, quantity: 1 }] } : state
   }),
-  addToCartQuantity: (product, quantity) => set((state) => {
+  addToCartQuantity: (product, quantity, agreedPrice = product.price, priceOverrideReason) => set((state) => {
     const quantityToAdd = Math.max(0, Math.floor(quantity))
     if (!quantityToAdd || !product.stock) return state
     const item = state.cart.find((cartItem) => cartItem.id === product.id)
-    if (item) return { cart: state.cart.map((cartItem) => cartItem.id === product.id ? { ...cartItem, quantity: Math.min(cartItem.quantity + quantityToAdd, product.stock) } : cartItem) }
-    return { cart: [...state.cart, { ...product, quantity: Math.min(quantityToAdd, product.stock) }] }
+    if (item) return { cart: state.cart.map((cartItem) => cartItem.id === product.id ? { ...cartItem, price: agreedPrice, listPrice: cartItem.listPrice ?? product.price, priceOverrideReason, quantity: Math.min(cartItem.quantity + quantityToAdd, product.stock) } : cartItem) }
+    return { cart: [...state.cart, { ...product, price: agreedPrice, listPrice: product.price, priceOverrideReason, quantity: Math.min(quantityToAdd, product.stock) }] }
   }),
   updateQuantity: (id, quantity) => set((state) => ({ cart: quantity < 1 ? state.cart.filter((item) => item.id !== id) : state.cart.map((item) => item.id === id ? { ...item, quantity } : item) })),
   updateUnitPrice: (id, price) => set((state) => ({ cart: state.cart.map((item) => item.id === id ? { ...item, price: Math.max(0, Number.isFinite(price) ? price : item.price) } : item) })),
