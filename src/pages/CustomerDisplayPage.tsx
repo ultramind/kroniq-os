@@ -14,7 +14,7 @@ export function CustomerDisplayPage() {
     <main className="customer-display min-h-screen px-6 py-8 text-white sm:px-12 sm:py-12">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col">
         <header className="flex items-center justify-between border-b border-slate-700/70 pb-6">
-          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center bg-white text-[#0B1121]"><ShoppingOutlined /></div><div><p className="m-0 text-xs font-semibold uppercase tracking-[.2em] text-slate-400">KroniqOS</p><h1 className="m-0 text-xl font-semibold">Your order</h1></div></div>
+          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center bg-white text-[#0B1121]"><ShoppingOutlined /></div><div><p className="m-0 text-xs font-semibold uppercase tracking-[.2em] text-slate-400">Kroniqos</p><h1 className="m-0 text-xl font-semibold">Your order</h1></div></div>
           <span className="text-sm text-slate-400">{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
         </header>
 

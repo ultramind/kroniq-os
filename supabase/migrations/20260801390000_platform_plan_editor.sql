@@ -1,4 +1,4 @@
--- Platform-admin controlled plans and an entitlement catalogue matching KroniqOS modules.
+-- Platform-admin controlled plans and an entitlement catalogue matching Kroniqos modules.
 update public.subscription_plans set
   limits = '{"stores":1,"staff":5,"products":2000,"warehouses":0,"product_images":0,"storefront_sections":0,"service_jobs":0}'::jsonb,
   features = '["Retail POS and offline checkout","Inventory, deliveries and customer credit","Expenses and basic reports"]'::jsonb

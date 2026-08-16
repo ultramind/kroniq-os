@@ -12,7 +12,7 @@ export type StoreSettings = {
 
 const key = 'naira-pos-settings'
 export const defaultStoreSettings: StoreSettings = {
-  storeName: 'KroniqOS Store',
+  storeName: 'Kroniqos Store',
   vat: 0,
   lowStock: 10,
   payments: ['cash', 'card', 'transfer', 'credit'],

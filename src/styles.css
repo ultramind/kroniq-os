@@ -133,13 +133,23 @@ html:has([data-theme='dark']), [data-theme='dark'] body { background: var(--app-
 .kroniq-loader--dark .kroniq-loader-orb { background: radial-gradient(circle, rgb(148 163 184 / 18%), transparent 68%); }
 .checkout-controls { background: #f8fafc; border-color: #e2e8f0; }
 [data-theme='dark'] .checkout-controls { background: #16171a !important; border-color: #303036 !important; }
+.storefront-template-picker .ant-radio-button-wrapper { height: auto; min-height: 86px; padding: 13px; white-space: normal; }
+.storefront-template-picker strong, .storefront-template-picker small { display: block; }
+.storefront-template-picker small { margin-top: 5px; color: #64748b; font-size: 11px; }
+.storefront--modern_catalogue header { border-bottom-color: #0b1121; }
+.storefront--modern_catalogue > section:first-of-type { background: linear-gradient(135deg, #f8fafc, #e5edf7) !important; color: #0b1121; }
+.storefront--modern_catalogue > section:first-of-type :is(h1, p) { color: inherit !important; }
+.storefront--modern_catalogue .group > div:first-child { border: 1px solid #e2e8f0; }
+.storefront--premium_brand > section:first-of-type { background: linear-gradient(125deg, #0b1121 0%, #17233c 55%, #32445f 100%) !important; }
+.storefront--premium_brand > section:first-of-type h1 { font-family: Georgia, 'Times New Roman', serif; letter-spacing: -.03em; }
+.storefront--premium_brand .group > div:first-child { box-shadow: 0 14px 34px rgb(11 17 33 / 12%); }
 .kroniq-loader-line { animation: kroniq-loader-progress 1.25s cubic-bezier(.65, 0, .35, 1) infinite; }
 .kroniq-loader-spin { animation: kroniq-loader-spin 1.2s linear infinite; }
 @keyframes kroniq-loader-breathe { 50% { transform: translate(-50%, -50%) scale(1.12); opacity: .55; } }
 @keyframes kroniq-loader-progress { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
 @keyframes kroniq-loader-spin { to { transform: rotate(360deg); } }
 
-/* Public KroniqOS marketing site: restrained motion with a premium SaaS feel. */
+/* Public Kroniqos marketing site: restrained motion with a premium SaaS feel. */
 .marketing-header { animation: marketing-header-in 500ms cubic-bezier(.16, 1, .3, 1) both; }
 .marketing-site .marketing-reveal { opacity: 0; transform: translateY(22px); transition: opacity 700ms cubic-bezier(.16, 1, .3, 1), transform 700ms cubic-bezier(.16, 1, .3, 1); }
 .marketing-site .marketing-reveal.is-visible { opacity: 1; transform: translateY(0); }

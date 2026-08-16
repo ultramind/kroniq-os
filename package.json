@@ -12,6 +12,7 @@
     "@ant-design/icons": "^6.3.2",
     "@supabase/supabase-js": "^2.57.4",
     "@types/jsbarcode": "^3.11.4",
+    "@zxing/browser": "^0.2.1",
     "antd": "^6.5.2",
     "autoprefixer": "^10.5.4",
     "dexie": "^4.0.11",

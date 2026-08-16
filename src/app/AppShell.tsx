@@ -32,7 +32,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const [collapsed, setCollapsed] = useState(true)
   const [businessModes, setBusinessModes] = useState<string[]>(['retail'])
   const [userName, setUserName] = useState('Account')
-  const [tenantBrand, setTenantBrand] = useState({ name: 'KroniqOS', logoUrl: '' })
+  const [tenantBrand, setTenantBrand] = useState({ name: 'Kroniqos', logoUrl: '' })
   useEffect(() => { if (!supabase) return; void (async () => { const { data: { user } } = await supabase.auth.getUser(); const { data: profile } = user ? await supabase.from('profiles').select('store_id, full_name').eq('id', user.id).maybeSingle() : { data: null }; if (profile?.full_name) setUserName(profile.full_name); else if (user?.email) setUserName(user.email); if (!profile) return; const [{ data: store }, { data: brand }] = await Promise.all([supabase.from('stores').select('organization_id').eq('id', profile.store_id).maybeSingle(), supabase.rpc('current_store_invoice_brand').maybeSingle()]); const invoiceBrand = brand as { company_name?: string; logo_url?: string } | null; if (invoiceBrand?.company_name) setTenantBrand({ name: invoiceBrand.company_name, logoUrl: invoiceBrand.logo_url ?? '' }); if (!store) return; const { data: organization } = await supabase.from('organizations').select('business_modes,name').eq('id', store.organization_id).maybeSingle(); if (organization?.business_modes?.length) setBusinessModes(organization.business_modes); if (organization?.name && !invoiceBrand?.company_name) setTenantBrand((current) => ({ ...current, name: organization.name })) })() }, [])
   const retailEnabled = businessModes.includes('retail')
   const servicesEnabled = businessModes.includes('services')

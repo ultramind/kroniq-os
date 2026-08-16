@@ -185,14 +185,14 @@ def cover(doc, kind, subtitle):
     r.bold = True; r.font.name = 'Calibri'; r.font.size = Pt(10); r.font.color.rgb = RGBColor.from_string(BLUE)
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(6)
-    r = p.add_run('KroniqOS')
+    r = p.add_run('Kroniqos')
     r.bold = True; r.font.name = 'Calibri'; r.font.size = Pt(30); r.font.color.rgb = RGBColor.from_string(INK)
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(24)
     r = p.add_run(subtitle)
     r.font.name = 'Calibri'; r.font.size = Pt(15); r.font.color.rgb = RGBColor.from_string(MUTED)
     table(doc, ['Document control', 'Value'], [
-        ('Product', 'KroniqOS — multi-tenant business operations platform'),
+        ('Product', 'Kroniqos — multi-tenant business operations platform'),
         ('Prepared for', 'Product Management'),
         ('Version', '1.0'),
         ('Date', date.today().strftime('%d %B %Y')),
@@ -207,7 +207,7 @@ def make_prd():
     doc = Document(); configure(doc, 'Product Requirements Document')
     cover(doc, 'Product requirements document', 'A SaaS platform for retail, service businesses, and online selling.')
     heading(doc, '1. Executive summary')
-    para(doc, 'KroniqOS is a multi-tenant SaaS application for African businesses that sell products, deliver services, or do both. It combines touch-friendly point of sale, inventory and cost tracking, customer credit, expenses, projects/contracts, an optional public storefront, and a platform administration layer.')
+    para(doc, 'Kroniqos is a multi-tenant SaaS application for African businesses that sell products, deliver services, or do both. It combines touch-friendly point of sale, inventory and cost tracking, customer credit, expenses, projects/contracts, an optional public storefront, and a platform administration layer.')
     para(doc, 'The product is built around a pragmatic operating model: the checkout remains offline-capable to protect customer service during unreliable connectivity, while shared financial, inventory, management, and platform controls are online-first so the server remains the source of truth.')
     heading(doc, '2. Product vision, objectives, and boundaries')
     table(doc, ['Area', 'Requirement / success outcome'], [
@@ -277,17 +277,17 @@ def make_prd():
     ], [3200, 6160])
     heading(doc, '9. Release acceptance checklist')
     bullets(doc, ['Tenant administrator can register a company, create/activate initial configuration and sign in.', 'Cashier completes, holds, resumes and syncs a sale; credit sale clears cart/profile state and defaults back to cash on the next transaction.', 'Manager/admin can receive delivery, count/adjust stock, add products/categories and see audited online changes.', 'Admin can review sales, quantity/item receipts, returns, credit payments, expenses and gross-profit reporting.', 'Service-enabled tenant can create a client/project, upload document, record payment/expense/stage and print tenant-branded invoice.', 'Growth tenant can publish online storefront content; Starter tenant cannot see the storefront module.', 'Platform role can view organisation records, edit entitlement plans, review audit data and open responsive dashboard on mobile.', 'All date controls use Ant Design date picker/range picker and all CSV imports use warning guidance plus sample download.'])
-    doc.save(OUT / 'KroniqOS_PRD.docx')
+    doc.save(OUT / 'Kroniqos_PRD.docx')
 
 
 def make_functional_spec():
     doc = Document(); configure(doc, 'Functional Specification')
     cover(doc, 'Functional specification', 'System behaviour, user flows, roles, data responsibilities and acceptance rules.')
     heading(doc, '1. System context')
-    para(doc, 'KroniqOS contains two protected application surfaces and one public surface: the tenant operations application, the KroniqOS platform control application, and an optional tenant storefront. All tenant data is scoped to an organisation and normally to one or more stores.')
+    para(doc, 'Kroniqos contains two protected application surfaces and one public surface: the tenant operations application, the Kroniqos platform control application, and an optional tenant storefront. All tenant data is scoped to an organisation and normally to one or more stores.')
     table(doc, ['Surface', 'Audience', 'Purpose'], [
         ('Tenant application', 'Tenant staff', 'Run retail, service, finance and configuration operations for one organisation.'),
-        ('Platform application', 'KroniqOS platform staff', 'Operate organisations, plans, billing, support/safety, status, analytics and platform audit.'),
+        ('Platform application', 'Kroniqos platform staff', 'Operate organisations, plans, billing, support/safety, status, analytics and platform audit.'),
         ('Public storefront', 'Customers of a Growth tenant', 'Browse tenant catalogue/content and begin ordering without dashboard access.'),
     ], [2100, 2500, 4760])
     heading(doc, '2. Authentication, tenancy and RBAC')
@@ -387,11 +387,11 @@ def make_functional_spec():
     ], [3000, 6360])
     heading(doc, '13. Operational runbook and unresolved follow-ups')
     bullets(doc, ['Run migrations in timestamp order and deploy Edge Functions after their related database functions/tables exist.', 'For billing, configure Paystack secrets and webhook endpoints in Supabase before enabling upgrades as a production promise.', 'Maintain a tested support path for “Sync needs attention”; never instruct staff to clear IndexedDB before confirming pending transactions are reconciled.', 'Confirm all critical server functions use the actual current role/membership source and write RLS tests for admin, manager and cashier.', 'Before multi-store launch, define branch onboarding, inventory transfer, reporting aggregation and user membership model.'])
-    doc.save(OUT / 'KroniqOS_Functional_Specification.docx')
+    doc.save(OUT / 'Kroniqos_Functional_Specification.docx')
 
 
 if __name__ == '__main__':
     make_prd()
     make_functional_spec()
-    print(OUT / 'KroniqOS_PRD.docx')
-    print(OUT / 'KroniqOS_Functional_Specification.docx')
+    print(OUT / 'Kroniqos_PRD.docx')
+    print(OUT / 'Kroniqos_Functional_Specification.docx')

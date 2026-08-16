@@ -23,7 +23,7 @@ export function ReceiptModal({ sale, items, onClose }: Props) {
 
   if (!sale) return null
   const settings = getStoreSettings()
-  const businessName = brand.companyName || settings.storeName || 'KroniqOS'
+  const businessName = brand.companyName || settings.storeName || 'Kroniqos'
   const initialPayment = sale.creditInitialPayment ?? 0
   const creditBalance = Math.max(0, sale.total - initialPayment)
   return <Modal open title="Sale complete" onCancel={onClose} footer={<Space><Button onClick={onClose}>Close</Button><Button type="primary" icon={<PrinterOutlined />} onClick={() => window.print()}>Print receipt</Button></Space>}>

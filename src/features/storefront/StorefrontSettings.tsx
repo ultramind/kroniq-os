@@ -1,10 +1,10 @@
 import { CopyOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Form, Image, Input, Switch, Upload, message } from 'antd'
+import { Alert, Button, Card, Form, Image, Input, Radio, Switch, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabase'
 
 const MAX_HERO_IMAGES = 2
-type Values = { slug: string; enabled: boolean; headline?: string; description?: string; phone?: string; whatsapp?: string; address?: string; primaryColor?: string; heroImageUrls?: string[]; logoUrl?: string; vision?: string; mission?: string; trustStats?: Array<{ value?: string; label?: string }> }
+type Values = { slug: string; enabled: boolean; templateKey?: 'classic_retail' | 'modern_catalogue' | 'premium_brand'; headline?: string; description?: string; phone?: string; whatsapp?: string; address?: string; primaryColor?: string; heroImageUrls?: string[]; logoUrl?: string; vision?: string; mission?: string; trustStats?: Array<{ value?: string; label?: string }> }
 
 export function StorefrontSettings() {
   const [form] = Form.useForm<Values>()
@@ -25,7 +25,7 @@ export function StorefrontSettings() {
       setStoreId(profile.store_id)
       const [storeResult, storefrontResult] = await Promise.all([
         supabase.from('stores').select('organization_id').eq('id', profile.store_id).maybeSingle(),
-        supabase.from('storefronts').select('slug,enabled,headline,description,phone,whatsapp,address,primary_color,hero_image_urls,logo_url,vision,mission,trust_stats').eq('store_id', profile.store_id).maybeSingle(),
+        supabase.from('storefronts').select('slug,enabled,template_key,headline,description,phone,whatsapp,address,primary_color,hero_image_urls,logo_url,vision,mission,trust_stats').eq('store_id', profile.store_id).maybeSingle(),
       ])
       if (storeResult.data) {
         const [organizationResult, subscriptionResult] = await Promise.all([
@@ -36,7 +36,7 @@ export function StorefrontSettings() {
         const subscription = subscriptionResult.data
         setCanUseLogo(Boolean(subscription && ['growth', 'business', 'enterprise'].includes(subscription.plan_code) && ['trial', 'active'].includes(subscription.status)))
       }
-      if (storefrontResult.data) form.setFieldsValue({ ...storefrontResult.data, primaryColor: storefrontResult.data.primary_color, heroImageUrls: storefrontResult.data.hero_image_urls ?? [], logoUrl: storefrontResult.data.logo_url ?? undefined, trustStats: Array.isArray(storefrontResult.data.trust_stats) ? storefrontResult.data.trust_stats : [] })
+      if (storefrontResult.data) form.setFieldsValue({ ...storefrontResult.data, templateKey: storefrontResult.data.template_key, primaryColor: storefrontResult.data.primary_color, heroImageUrls: storefrontResult.data.hero_image_urls ?? [], logoUrl: storefrontResult.data.logo_url ?? undefined, trustStats: Array.isArray(storefrontResult.data.trust_stats) ? storefrontResult.data.trust_stats : [] })
     })()
   }, [form])
 
@@ -97,6 +97,7 @@ export function StorefrontSettings() {
       store_id: profile.store_id,
       slug: values.slug.toLowerCase().trim(),
       enabled: values.enabled,
+      template_key: values.templateKey ?? 'classic_retail',
       headline: values.headline,
       description: values.description,
       phone: values.phone,
@@ -120,7 +121,8 @@ export function StorefrontSettings() {
   return <Card title="Online storefront" className="w-full xl:w-1/2">
     {holder}
     <p className="text-sm text-slate-500">Create a branded public catalogue. Only products marked as published online will appear.</p>
-    <Form form={form} layout="vertical" initialValues={{ enabled: false, primaryColor: '#0B1121', heroImageUrls: [] }} onFinish={(values) => void save(values)} className="mt-5">
+    <Form form={form} layout="vertical" initialValues={{ enabled: false, templateKey: 'classic_retail', primaryColor: '#0B1121', heroImageUrls: [] }} onFinish={(values) => void save(values)} className="mt-5">
+      <Form.Item name="templateKey" label="Storefront template" extra="You can change the design anytime; products, links, and content stay the same."><Radio.Group className="storefront-template-picker grid gap-2 sm:grid-cols-3" options={[{ value: 'classic_retail', label: <span><strong>Classic Retail</strong><small>Familiar and balanced</small></span> }, { value: 'modern_catalogue', label: <span><strong>Modern Catalogue</strong><small>Product-first browsing</small></span> }, { value: 'premium_brand', label: <span><strong>Premium Brand</strong><small>Visual and story-led</small></span> }]} /></Form.Item>
       <Form.Item name="slug" label="Public store URL" extra="Lowercase letters, numbers, and hyphens only." rules={[{ required: true, pattern: /^[a-z0-9-]{3,80}$/ }]}><Input addonBefore="/shop/" /></Form.Item>
       <Form.Item shouldUpdate noStyle>{() => { const slug = String(form.getFieldValue('slug') ?? '').trim(); const publicUrl = slug ? new URL(`/shop/${slug}`, window.location.origin).toString() : ''; return <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center"><Input value={publicUrl} readOnly placeholder="Your full public store link will appear here" /><Button className="!h-8 shrink-0" icon={<CopyOutlined />} disabled={!publicUrl} onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => api.success('Public store URL copied.')).catch(() => api.error('Could not copy the URL. Please copy it manually.'))}>Copy URL</Button></div> }}</Form.Item>
       <Form.Item name="headline" label="Headline"><Input placeholder="Fresh groceries, delivered with care." /></Form.Item>
