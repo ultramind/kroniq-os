@@ -21,7 +21,11 @@ export const defaultStoreSettings: StoreSettings = {
 }
 
 export function getStoreSettings(): StoreSettings {
-  try { return { ...defaultStoreSettings, ...JSON.parse(localStorage.getItem(key) ?? '{}') } } catch { return defaultStoreSettings }
+  try {
+    return { ...defaultStoreSettings, ...JSON.parse(localStorage.getItem(key) ?? '{}') }
+  } catch {
+    return defaultStoreSettings
+  }
 }
 
 export function saveStoreSettings(settings: StoreSettings) {

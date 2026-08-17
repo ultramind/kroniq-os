@@ -4,9 +4,11 @@ export async function functionErrorMessage(error: unknown, fallback = 'The serve
   try {
     const response = candidate.context
     if (response && typeof response.json === 'function') {
-      const body = await response.clone().json() as { error?: string; message?: string }
+      const body = (await response.clone().json()) as { error?: string; message?: string }
       if (body.error || body.message) return body.error ?? body.message ?? fallback
     }
-  } catch { /* use the standard message below */ }
+  } catch {
+    /* use the standard message below */
+  }
   return candidate.message ?? fallback
 }

@@ -1,5 +1,20 @@
 import { MinusOutlined, MonitorOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Checkbox, DatePicker, Empty, Input, InputNumber, Modal, Select, Space, Statistic, Tooltip, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  DatePicker,
+  Empty,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Statistic,
+  Tooltip,
+  Typography,
+} from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 import { db } from '../../db'
@@ -29,8 +44,18 @@ type Props = {
   onMethodChange: (method: PaymentMethod) => void
   onQuantityChange: (id: string, quantity: number) => void
   onUnitPriceChange: (id: string, price: number) => void
-  onCheckout: (credit?: { customerName: string; customerPhone: string; dueDate?: string; initialPayment?: number }) => void
-  onHistoricalCheckout?: (credit: { customerName: string; customerPhone: string; dueDate?: string; initialPayment?: number } | undefined, saleDate: string, deductStock: boolean) => void
+  onCheckout: (credit?: {
+    customerName: string
+    customerPhone: string
+    dueDate?: string
+    initialPayment?: number
+  }) => void
+  onHistoricalCheckout?: (
+    credit:
+      { customerName: string; customerPhone: string; dueDate?: string; initialPayment?: number } | undefined,
+    saleDate: string,
+    deductStock: boolean,
+  ) => void
   historicalSaving?: boolean
   onHold: () => void
   onOpenCustomerDisplay: () => void
@@ -71,7 +96,8 @@ export function CartPanel({
   const canRecordHistorical = role === 'admin' || role === 'manager'
   const change = cashReceived === null ? null : Math.max(0, cashReceived - total)
   const cashIsInsufficient = paymentMethod === 'cash' && (cashReceived === null || cashReceived < total)
-  const creditDetailsMissing = paymentMethod === 'credit' && (!creditCustomerName.trim() || !creditCustomerPhone.trim())
+  const creditDetailsMissing =
+    paymentMethod === 'credit' && (!creditCustomerName.trim() || !creditCustomerPhone.trim())
 
   function clearCreditDetails() {
     setCreditCustomerName('')
@@ -104,15 +130,38 @@ export function CartPanel({
       try {
         const localSales = await db.sales.toArray()
         const known: Creditor[] = localSales
-          .filter((sale) => sale.paymentMethod === 'credit' && sale.creditCustomerName && sale.creditCustomerPhone)
-          .map((sale) => ({ key: `credit:${sale.creditCustomerName!.trim().toLowerCase()}|${sale.creditCustomerPhone!.trim()}`, name: sale.creditCustomerName!.trim(), phone: sale.creditCustomerPhone!.trim() }))
+          .filter(
+            (sale) => sale.paymentMethod === 'credit' && sale.creditCustomerName && sale.creditCustomerPhone,
+          )
+          .map((sale) => ({
+            key: `credit:${sale.creditCustomerName!.trim().toLowerCase()}|${sale.creditCustomerPhone!.trim()}`,
+            name: sale.creditCustomerName!.trim(),
+            phone: sale.creditCustomerPhone!.trim(),
+          }))
 
         if (supabase && navigator.onLine) {
-          const { data: { user } } = await supabase.auth.getUser()
-          const { data: profile } = user ? await supabase.from('profiles').select('store_id').eq('id', user.id).maybeSingle() : { data: null }
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
+          const { data: profile } = user
+            ? await supabase.from('profiles').select('store_id').eq('id', user.id).maybeSingle()
+            : { data: null }
           if (profile?.store_id) {
-            const { data: customers } = await supabase.from('customers').select('full_name,phone').eq('store_id', profile.store_id).not('phone', 'is', null).order('full_name')
-            known.push(...(customers ?? []).filter((customer) => customer.full_name && customer.phone).map((customer) => ({ key: `customer:${customer.full_name.trim().toLowerCase()}|${customer.phone.trim()}`, name: customer.full_name.trim(), phone: customer.phone.trim() })))
+            const { data: customers } = await supabase
+              .from('customers')
+              .select('full_name,phone')
+              .eq('store_id', profile.store_id)
+              .not('phone', 'is', null)
+              .order('full_name')
+            known.push(
+              ...(customers ?? [])
+                .filter((customer) => customer.full_name && customer.phone)
+                .map((customer) => ({
+                  key: `customer:${customer.full_name.trim().toLowerCase()}|${customer.phone.trim()}`,
+                  name: customer.full_name.trim(),
+                  phone: customer.phone.trim(),
+                })),
+            )
           }
         }
 
@@ -127,12 +176,21 @@ export function CartPanel({
 
   function selectPaymentMethod(method: PaymentMethod) {
     onMethodChange(method)
-    if (method === 'cash') { setCashEntryManual(false); setCashReceived(total) }
-    if (method === 'credit') { setCreditError(''); setCreditModalOpen(true) }
+    if (method === 'cash') {
+      setCashEntryManual(false)
+      setCashReceived(total)
+    }
+    if (method === 'credit') {
+      setCreditError('')
+      setCreditModalOpen(true)
+    }
   }
 
   function confirmCreditDetails() {
-    if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) { setCreditError('Customer name and phone number are required for credit sales.'); return }
+    if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) {
+      setCreditError('Customer name and phone number are required for credit sales.')
+      return
+    }
     setCreditError('')
     setCreditModalOpen(false)
   }
@@ -140,8 +198,28 @@ export function CartPanel({
   return (
     <Card
       className="shadow-sm"
-      title={<Space><ShoppingCartOutlined />Current sale <Text type="secondary">({cart.reduce((count, item) => count + item.quantity, 0)} items)</Text></Space>}
-      extra={<Space size={8}><Tooltip title="Open customer display"><Button aria-label="Open customer display" className="!h-10 !w-10 !text-base" icon={<MonitorOutlined />} onClick={onOpenCustomerDisplay} /></Tooltip><Button danger className="!h-10 !px-4 !text-sm" disabled={!cart.length} onClick={onHold}>Hold sale</Button></Space>}
+      title={
+        <Space>
+          <ShoppingCartOutlined />
+          Current sale{' '}
+          <Text type="secondary">({cart.reduce((count, item) => count + item.quantity, 0)} items)</Text>
+        </Space>
+      }
+      extra={
+        <Space size={8}>
+          <Tooltip title="Open customer display">
+            <Button
+              aria-label="Open customer display"
+              className="!h-10 !w-10 !text-base"
+              icon={<MonitorOutlined />}
+              onClick={onOpenCustomerDisplay}
+            />
+          </Tooltip>
+          <Button danger className="!h-10 !px-4 !text-sm" disabled={!cart.length} onClick={onHold}>
+            Hold sale
+          </Button>
+        </Space>
+      }
       bodyStyle={{ padding: 20 }}
     >
       {cart.length === 0 ? (
@@ -149,12 +227,60 @@ export function CartPanel({
       ) : (
         <div className="max-h-[360px] overflow-y-auto">
           {cart.map((item) => (
-            <div key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-slate-100 py-4">
-              <div><Text strong>{item.name}</Text><br />{isHistorical ? <div className="mt-2"><Text type="secondary" className="mb-1 block text-xs">Unit price</Text><CurrencyInput aria-label={`Unit price for ${item.name}`} min={0} precision={2} size="middle" className="historical-unit-price" value={item.price} onChange={(value) => onUnitPriceChange(item.id, typeof value === 'number' ? value : item.price)} /></div> : <div><Text type="secondary" className="text-xs">{formatNaira(item.price)} each</Text>{item.listPrice !== undefined && item.listPrice !== item.price && <Text className="ml-2 text-xs text-amber-700">Agreed from {formatNaira(item.listPrice)}</Text>}</div>}</div>
+            <div
+              key={item.id}
+              className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-slate-100 py-4"
+            >
+              <div>
+                <Text strong>{item.name}</Text>
+                <br />
+                {isHistorical ? (
+                  <div className="mt-2">
+                    <Text type="secondary" className="mb-1 block text-xs">
+                      Unit price
+                    </Text>
+                    <CurrencyInput
+                      aria-label={`Unit price for ${item.name}`}
+                      min={0}
+                      precision={2}
+                      size="middle"
+                      className="historical-unit-price"
+                      value={item.price}
+                      onChange={(value) =>
+                        onUnitPriceChange(item.id, typeof value === 'number' ? value : item.price)
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <Text type="secondary" className="text-xs">
+                      {formatNaira(item.price)} each
+                    </Text>
+                    {item.listPrice !== undefined && item.listPrice !== item.price && (
+                      <Text className="ml-2 text-xs text-amber-700">
+                        Agreed from {formatNaira(item.listPrice)}
+                      </Text>
+                    )}
+                  </div>
+                )}
+              </div>
               <Space.Compact>
-                <Button size="middle" className="touch-target" icon={<MinusOutlined />} onClick={() => onQuantityChange(item.id, item.quantity - 1)} />
-                <Button size="middle" className="touch-target" disabled>{item.quantity}</Button>
-                <Button size="middle" className="touch-target" icon={<PlusOutlined />} disabled={item.quantity >= item.stock} onClick={() => onQuantityChange(item.id, item.quantity + 1)} />
+                <Button
+                  size="middle"
+                  className="touch-target"
+                  icon={<MinusOutlined />}
+                  onClick={() => onQuantityChange(item.id, item.quantity - 1)}
+                />
+                <Button size="middle" className="touch-target" disabled>
+                  {item.quantity}
+                </Button>
+                <Button
+                  size="middle"
+                  className="touch-target"
+                  icon={<PlusOutlined />}
+                  disabled={item.quantity >= item.stock}
+                  onClick={() => onQuantityChange(item.id, item.quantity + 1)}
+                />
               </Space.Compact>
               <Text strong>{formatNaira(item.price * item.quantity)}</Text>
             </div>
@@ -162,36 +288,289 @@ export function CartPanel({
         </div>
       )}
 
-      <div className="my-5 flex items-end justify-between"><Text strong>Total</Text><Statistic value={total} formatter={(value) => formatNaira(Number(value))} valueStyle={{ fontSize: 26, color: '#172316' }} /></div>
+      <div className="my-5 flex items-end justify-between">
+        <Text strong>Total</Text>
+        <Statistic
+          value={total}
+          formatter={(value) => formatNaira(Number(value))}
+          valueStyle={{ fontSize: 26, color: '#172316' }}
+        />
+      </div>
 
-      {canRecordHistorical && <div className="mb-4"><label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="sale-date">Sale date</label><DatePicker id="sale-date" value={dayjs(saleDate)} format="DD MMM YYYY" allowClear={false} className="w-full" disabledDate={(date) => date.isAfter(dayjs(), 'day')} onChange={(_, value) => { const selectedDate = value || today; setSaleDate(selectedDate); if (selectedDate >= today) setDeductStock(false) }} />{isHistorical && <><Alert className="historical-sale-notice mt-2" type="warning" showIcon message={<span><strong>{deductStock ? 'Stock correction enabled' : 'Historical sale'}</strong><span className="historical-sale-notice-copy">{deductStock ? ' Reduces current stock; excluded from today’s cash shift.' : ' Reports on the selected date only; current stock stays unchanged.'}</span></span>} /><Checkbox className="mt-2" checked={deductStock} onChange={(event) => setDeductStock(event.target.checked)}>Deduct items from current stock</Checkbox></>}</div>}
+      {canRecordHistorical && (
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="sale-date">
+            Sale date
+          </label>
+          <DatePicker
+            id="sale-date"
+            value={dayjs(saleDate)}
+            format="DD MMM YYYY"
+            allowClear={false}
+            className="w-full"
+            disabledDate={(date) => date.isAfter(dayjs(), 'day')}
+            onChange={(_, value) => {
+              const selectedDate = value || today
+              setSaleDate(selectedDate)
+              if (selectedDate >= today) setDeductStock(false)
+            }}
+          />
+          {isHistorical && (
+            <>
+              <Alert
+                className="historical-sale-notice mt-2"
+                type="warning"
+                showIcon
+                message={
+                  <span>
+                    <strong>{deductStock ? 'Stock correction enabled' : 'Historical sale'}</strong>
+                    <span className="historical-sale-notice-copy">
+                      {deductStock
+                        ? ' Reduces current stock; excluded from today’s cash shift.'
+                        : ' Reports on the selected date only; current stock stays unchanged.'}
+                    </span>
+                  </span>
+                }
+              />
+              <Checkbox
+                className="mt-2"
+                checked={deductStock}
+                onChange={(event) => setDeductStock(event.target.checked)}
+              >
+                Deduct items from current stock
+              </Checkbox>
+            </>
+          )}
+        </div>
+      )}
 
-      {role !== 'cashier' && <div className="mb-4 flex items-center justify-between gap-3"><Text>Manager discount (%)</Text><InputNumber min={0} max={100} value={discountPercent} onChange={(value) => onDiscountChange(Number(value ?? 0))} /></div>}
+      {role !== 'cashier' && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Text>Manager discount (%)</Text>
+          <InputNumber
+            min={0}
+            max={100}
+            value={discountPercent}
+            onChange={(value) => onDiscountChange(Number(value ?? 0))}
+          />
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3">
-        {methods.map((method) => <Button key={method.id} size="large" danger={method.id === 'credit'} className={`touch-target text-base active:scale-[0.98] ${method.id === 'credit' && paymentMethod === method.id ? '!bg-red-600 !text-white hover:!bg-red-500' : ''}`} type={paymentMethod === method.id ? 'primary' : 'default'} onClick={() => selectPaymentMethod(method.id)}>{method.label}</Button>)}
+        {methods.map((method) => (
+          <Button
+            key={method.id}
+            size="large"
+            danger={method.id === 'credit'}
+            className={`touch-target text-base active:scale-[0.98] ${method.id === 'credit' && paymentMethod === method.id ? '!bg-red-600 !text-white hover:!bg-red-500' : ''}`}
+            type={paymentMethod === method.id ? 'primary' : 'default'}
+            onClick={() => selectPaymentMethod(method.id)}
+          >
+            {method.label}
+          </Button>
+        ))}
       </div>
 
       {paymentMethod === 'cash' && (
-        <div className="mb-4 rounded-lg bg-emerald-50 p-3">
-          <div className="mb-2 flex items-center justify-between gap-3"><label className="block text-sm font-medium text-slate-700" htmlFor="cash-received">Cash received</label><Button size="small" type={!cashEntryManual ? 'primary' : 'default'} onClick={() => { setCashEntryManual(false); setCashReceived(total) }}>Exact · {formatNaira(total)}</Button></div>
-          <div className="mb-3 flex flex-wrap gap-2">
-            {[500, 1000, 2000, 5000, 10000].map((amount) => <Button key={amount} size="small" onClick={() => { setCashEntryManual(true); setCashReceived(amount) }}>₦{amount.toLocaleString('en-NG')}</Button>)}
+        <div className="cash-received-section mb-4 rounded-lg p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium" htmlFor="cash-received">
+              Cash received
+            </label>
+            <Button
+              size="small"
+              type={!cashEntryManual ? 'primary' : 'default'}
+              onClick={() => {
+                setCashEntryManual(false)
+                setCashReceived(total)
+              }}
+            >
+              Exact · {formatNaira(total)}
+            </Button>
           </div>
-          <CurrencyInput id="cash-received" min={0} precision={2} value={cashReceived} onChange={(value) => { setCashEntryManual(true); setCashReceived(typeof value === 'number' ? value : null) }} placeholder="Enter another amount" size="large" className="w-full" />
+          <div className="mb-3 flex flex-wrap gap-2">
+            {[500, 1000, 2000, 5000, 10000].map((amount) => (
+              <Button
+                key={amount}
+                size="small"
+                onClick={() => {
+                  setCashEntryManual(true)
+                  setCashReceived(amount)
+                }}
+              >
+                ₦{amount.toLocaleString('en-NG')}
+              </Button>
+            ))}
+          </div>
+          <CurrencyInput
+            id="cash-received"
+            min={0}
+            precision={2}
+            value={cashReceived}
+            onChange={(value) => {
+              setCashEntryManual(true)
+              setCashReceived(typeof value === 'number' ? value : null)
+            }}
+            placeholder="Enter another amount"
+            size="large"
+            className="w-full"
+          />
           <div className="mt-2 flex items-center justify-between">
-            <Text type={cashIsInsufficient ? 'danger' : 'secondary'}>{cashReceived !== null && cashReceived < total ? `Add ${formatNaira(total - cashReceived)} more` : 'Change due'}</Text>
-            <Text strong className="text-base">{change === null ? '—' : formatNaira(change)}</Text>
+            <Text type={cashIsInsufficient ? 'danger' : 'secondary'}>
+              {cashReceived !== null && cashReceived < total
+                ? `Add ${formatNaira(total - cashReceived)} more`
+                : 'Change due'}
+            </Text>
+            <Text strong className="text-base">
+              {change === null ? '—' : formatNaira(change)}
+            </Text>
           </div>
         </div>
       )}
 
-      {paymentMethod === 'credit' && <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2"><div><Text strong className="text-red-800">Customer credit</Text><Text className="block text-xs text-red-700">{creditCustomerName ? `${creditCustomerName} · outstanding ${formatNaira(total - (creditInitialPayment ?? 0))}` : 'Customer details required'}</Text></div><Button danger size="small" onClick={() => setCreditModalOpen(true)}>Edit details</Button></div>}
+      {paymentMethod === 'credit' && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+          <div>
+            <Text strong className="text-red-800">
+              Customer credit
+            </Text>
+            <Text className="block text-xs text-red-700">
+              {creditCustomerName
+                ? `${creditCustomerName} · outstanding ${formatNaira(total - (creditInitialPayment ?? 0))}`
+                : 'Customer details required'}
+            </Text>
+          </div>
+          <Button danger size="small" onClick={() => setCreditModalOpen(true)}>
+            Edit details
+          </Button>
+        </div>
+      )}
 
-      <Button type="primary" size="large" block loading={historicalSaving} className="touch-checkout touch-target whitespace-normal px-2 text-base font-bold leading-tight active:scale-[0.98]" disabled={!cart.length || cashIsInsufficient || creditDetailsMissing || (isHistorical && !onHistoricalCheckout)} onClick={() => { const credit = paymentMethod === 'credit' ? { customerName: creditCustomerName.trim(), customerPhone: creditCustomerPhone.trim(), dueDate: creditDueDate || undefined, initialPayment: creditInitialPayment ?? 0 } : undefined; if (isHistorical) onHistoricalCheckout?.(credit, saleDate, deductStock); else onCheckout(credit); if (paymentMethod === 'credit') clearCreditDetails() }}>{isHistorical ? `${deductStock ? 'Record and deduct stock' : 'Record historical sale'} · ${formatNaira(total)}` : `Complete sale · ${formatNaira(total)}`}</Button>
+      <Button
+        type="primary"
+        size="large"
+        block
+        loading={historicalSaving}
+        className="touch-checkout touch-target whitespace-normal px-2 text-base font-bold leading-tight active:scale-[0.98]"
+        disabled={
+          !cart.length ||
+          cashIsInsufficient ||
+          creditDetailsMissing ||
+          (isHistorical && !onHistoricalCheckout)
+        }
+        onClick={() => {
+          const credit =
+            paymentMethod === 'credit'
+              ? {
+                  customerName: creditCustomerName.trim(),
+                  customerPhone: creditCustomerPhone.trim(),
+                  dueDate: creditDueDate || undefined,
+                  initialPayment: creditInitialPayment ?? 0,
+                }
+              : undefined
+          if (isHistorical) onHistoricalCheckout?.(credit, saleDate, deductStock)
+          else onCheckout(credit)
+          if (paymentMethod === 'credit') clearCreditDetails()
+        }}
+      >
+        {isHistorical
+          ? `${deductStock ? 'Record and deduct stock' : 'Record historical sale'} · ${formatNaira(total)}`
+          : `Complete sale · ${formatNaira(total)}`}
+      </Button>
       {children && <div className="mt-5">{children}</div>}
-      <Modal open={creditModalOpen} title="Customer credit details" okText="Use credit details" onOk={confirmCreditDetails} onCancel={() => { setCreditModalOpen(false); if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) onMethodChange('cash') }} destroyOnClose={false}>
-        <div className="space-y-4 pt-2">{creditError && <Alert type="error" showIcon message={creditError} />}<div><label className="mb-1 block text-sm font-medium text-slate-700">Existing creditor <span className="font-normal text-slate-400">(optional)</span></label><Select showSearch allowClear loading={loadingCreditors} optionFilterProp="label" placeholder="Search previous creditor or client" size="large" className="w-full" options={creditors.map((creditor) => ({ value: creditor.key, label: `${creditor.name} · ${creditor.phone}` }))} onChange={(value) => { const creditor = creditors.find((item) => item.key === value); if (creditor) { setCreditCustomerName(creditor.name); setCreditCustomerPhone(creditor.phone); setCreditError('') } }} /></div><div className="border-t border-slate-200 pt-4"><Text type="secondary" className="mb-3 block text-xs">Or add a new creditor</Text><div className="space-y-4"><div><label className="mb-1 block text-sm font-medium text-slate-700">Customer full name</label><Input value={creditCustomerName} onChange={(event) => setCreditCustomerName(event.target.value)} placeholder="Customer full name" size="large" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Phone number</label><Input value={creditCustomerPhone} onChange={(event) => setCreditCustomerPhone(event.target.value)} placeholder="Phone number" inputMode="tel" size="large" /></div></div></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Initial payment <span className="font-normal text-slate-400">(optional)</span></label><CurrencyInput value={creditInitialPayment} onChange={(value) => setCreditInitialPayment(typeof value === 'number' ? value : null)} min={0} max={total} precision={2} placeholder="₦0.00" size="large" className="w-full" /></div><div><label className="mb-1 block text-sm font-medium text-slate-700">Expected payment date <span className="font-normal text-slate-400">(optional)</span></label><DatePicker value={creditDueDate ? dayjs(creditDueDate) : null} onChange={(value) => setCreditDueDate(value?.format('YYYY-MM-DD') ?? '')} format="DD MMM YYYY" size="large" className="w-full" /></div></div>
+      <Modal
+        open={creditModalOpen}
+        title="Customer credit details"
+        okText="Use credit details"
+        onOk={confirmCreditDetails}
+        onCancel={() => {
+          setCreditModalOpen(false)
+          if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) onMethodChange('cash')
+        }}
+        destroyOnClose={false}
+      >
+        <div className="space-y-4 pt-2">
+          {creditError && <Alert type="error" showIcon message={creditError} />}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Existing creditor <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <Select
+              showSearch
+              allowClear
+              loading={loadingCreditors}
+              optionFilterProp="label"
+              placeholder="Search previous creditor or client"
+              size="large"
+              className="w-full"
+              options={creditors.map((creditor) => ({
+                value: creditor.key,
+                label: `${creditor.name} · ${creditor.phone}`,
+              }))}
+              onChange={(value) => {
+                const creditor = creditors.find((item) => item.key === value)
+                if (creditor) {
+                  setCreditCustomerName(creditor.name)
+                  setCreditCustomerPhone(creditor.phone)
+                  setCreditError('')
+                }
+              }}
+            />
+          </div>
+          <div className="border-t border-slate-200 pt-4">
+            <Text type="secondary" className="mb-3 block text-xs">
+              Or add a new creditor
+            </Text>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Customer full name</label>
+                <Input
+                  value={creditCustomerName}
+                  onChange={(event) => setCreditCustomerName(event.target.value)}
+                  placeholder="Customer full name"
+                  size="large"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Phone number</label>
+                <Input
+                  value={creditCustomerPhone}
+                  onChange={(event) => setCreditCustomerPhone(event.target.value)}
+                  placeholder="Phone number"
+                  inputMode="tel"
+                  size="large"
+                />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Initial payment <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <CurrencyInput
+              value={creditInitialPayment}
+              onChange={(value) => setCreditInitialPayment(typeof value === 'number' ? value : null)}
+              min={0}
+              max={total}
+              precision={2}
+              placeholder="₦0.00"
+              size="large"
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Expected payment date <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <DatePicker
+              value={creditDueDate ? dayjs(creditDueDate) : null}
+              onChange={(value) => setCreditDueDate(value?.format('YYYY-MM-DD') ?? '')}
+              format="DD MMM YYYY"
+              size="large"
+              className="w-full"
+            />
+          </div>
+        </div>
       </Modal>
     </Card>
   )

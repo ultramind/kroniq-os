@@ -8,7 +8,9 @@ import './styles.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ThemeProvider><AuthGate /></ThemeProvider>
+      <ThemeProvider>
+        <AuthGate />
+      </ThemeProvider>
     </BrowserRouter>
-  </StrictMode>
+  </StrictMode>,
 )

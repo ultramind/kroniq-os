@@ -16,7 +16,10 @@ export function useBackgroundSync(onSynced: (count: number) => void, onError: (m
     const onOnline = () => void run()
     window.addEventListener('online', onOnline)
     const timer = window.setInterval(() => void run(), 30_000)
-    return () => { window.removeEventListener('online', onOnline); window.clearInterval(timer) }
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.clearInterval(timer)
+    }
   }, [run])
 
   return run

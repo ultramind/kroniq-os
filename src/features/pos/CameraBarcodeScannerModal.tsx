@@ -37,15 +37,39 @@ export function CameraBarcodeScannerModal({ open, onClose, onScan }: Props) {
       } catch (cause) {
         if (!cancelled) {
           const denied = cause instanceof DOMException && cause.name === 'NotAllowedError'
-          setError(denied ? 'Camera access was blocked. Allow camera access in your browser settings and try again.' : 'We could not start the camera. On iPhone or iPad, use Safari or Chrome over HTTPS and allow camera access.')
+          setError(
+            denied
+              ? 'Camera access was blocked. Allow camera access in your browser settings and try again.'
+              : 'We could not start the camera. On iPhone or iPad, use Safari or Chrome over HTTPS and allow camera access.',
+          )
         }
       }
     })()
 
-    return () => { cancelled = true; controls?.stop() }
+    return () => {
+      cancelled = true
+      controls?.stop()
+    }
   }, [onClose, onScan, open])
 
-  return <Modal title="Scan barcode" open={open} footer={<Button onClick={onClose}>Cancel</Button>} onCancel={onClose} destroyOnClose>
-    <div className="space-y-3"><div className="overflow-hidden bg-black"><video ref={videoRef} className="block aspect-video w-full object-cover" muted playsInline /></div><Space><ScanOutlined /><Typography.Text>Point the camera at the barcode.</Typography.Text></Space>{error && <Alert type="warning" showIcon message={error} />}</div>
-  </Modal>
+  return (
+    <Modal
+      title="Scan barcode"
+      open={open}
+      footer={<Button onClick={onClose}>Cancel</Button>}
+      onCancel={onClose}
+      destroyOnClose
+    >
+      <div className="space-y-3">
+        <div className="overflow-hidden bg-black">
+          <video ref={videoRef} className="block aspect-video w-full object-cover" muted playsInline />
+        </div>
+        <Space>
+          <ScanOutlined />
+          <Typography.Text>Point the camera at the barcode.</Typography.Text>
+        </Space>
+        {error && <Alert type="warning" showIcon message={error} />}
+      </div>
+    </Modal>
+  )
 }

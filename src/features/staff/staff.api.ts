@@ -12,5 +12,5 @@ async function invoke<T>(body: Record<string, unknown>) {
 export const staffApi = {
   list: async () => (await invoke<{ staff: StaffMember[] }>({ action: 'list' })).staff,
   create: (input: CreateStaffInput) => invoke<{ staff: StaffMember }>({ action: 'create', ...input }),
-  deactivate: (staffId: string) => invoke<{ success: true }>({ action: 'deactivate', staffId })
+  deactivate: (staffId: string) => invoke<{ success: true }>({ action: 'deactivate', staffId }),
 }

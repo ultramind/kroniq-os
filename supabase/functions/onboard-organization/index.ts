@@ -4,10 +4,21 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 
 function slugify(value: string) {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'company'
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48) || 'company'
+  )
 }
 
 const starterCatalogue = [
@@ -39,14 +50,23 @@ async function seedStarterProducts(adminClient: ReturnType<typeof createClient>,
     .from('categories')
     .insert(categoryNames.map((name) => ({ store_id: storeId, name })))
     .select('id, name')
-  if (categoriesError || !categories) throw categoriesError ?? new Error('Could not create starter categories')
+  if (categoriesError || !categories)
+    throw categoriesError ?? new Error('Could not create starter categories')
   const categoryIds = new Map(categories.map((category) => [category.name, category.id]))
   const { data: products, error: productsError } = await adminClient
     .from('products')
-    .insert(starterCatalogue.map(([category, name, sku, cost, price, stock, threshold]) => ({
-      store_id: storeId, category_id: categoryIds.get(category), name, sku,
-      cost_price_kobo: cost * 100, price_kobo: price * 100, stock_quantity: stock, low_stock_threshold: threshold,
-    })))
+    .insert(
+      starterCatalogue.map(([category, name, sku, cost, price, stock, threshold]) => ({
+        store_id: storeId,
+        category_id: categoryIds.get(category),
+        name,
+        sku,
+        cost_price_kobo: cost * 100,
+        price_kobo: price * 100,
+        stock_quantity: stock,
+        low_stock_threshold: threshold,
+      })),
+    )
     .select('id, stock_quantity')
   if (productsError || !products) throw productsError ?? new Error('Could not create starter products')
   const { data: shopFloor, error: locationError } = await adminClient
@@ -55,9 +75,13 @@ async function seedStarterProducts(adminClient: ReturnType<typeof createClient>,
     .select('id')
     .single()
   if (locationError || !shopFloor) throw locationError ?? new Error('Could not create the shop floor')
-  const { error: balanceError } = await adminClient.from('inventory_location_balances').insert(products.map((product) => ({
-    location_id: shopFloor.id, product_id: product.id, quantity: product.stock_quantity,
-  })))
+  const { error: balanceError } = await adminClient.from('inventory_location_balances').insert(
+    products.map((product) => ({
+      location_id: shopFloor.id,
+      product_id: product.id,
+      quantity: product.stock_quantity,
+    })),
+  )
   if (balanceError) throw balanceError
 }
 
@@ -67,20 +91,33 @@ Deno.serve(async (request) => {
     const url = Deno.env.get('SUPABASE_URL')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const authHeader = request.headers.get('Authorization') ?? ''
-    const userClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })
+    const userClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    })
     const adminClient = createClient(url, serviceKey)
-    const { data: { user }, error: authError } = await userClient.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await userClient.auth.getUser()
     if (authError || !user) return json({ error: 'Unauthenticated' }, 401)
 
     const { data: existing } = await adminClient.from('profiles').select('id').eq('id', user.id).maybeSingle()
     if (existing) return json({ error: 'This account has already completed onboarding.' }, 409)
 
-    const { companyName, branchName, fullName, businessMode = 'retail', currencyCode = 'NGN' } = await request.json()
+    const {
+      companyName,
+      branchName,
+      fullName,
+      businessMode = 'retail',
+      currencyCode = 'NGN',
+    } = await request.json()
     if (![companyName, branchName, fullName].every((value) => typeof value === 'string' && value.trim())) {
       return json({ error: 'Company name, first branch name, and your name are required.' }, 400)
     }
-    if (!['retail', 'services', 'hybrid'].includes(businessMode)) return json({ error: 'Choose a valid business model.' }, 400)
-    if (!['NGN', 'GHS', 'KES', 'ZAR', 'USD'].includes(currencyCode)) return json({ error: 'Choose a valid business currency.' }, 400)
+    if (!['retail', 'services', 'hybrid'].includes(businessMode))
+      return json({ error: 'Choose a valid business model.' }, 400)
+    if (!['NGN', 'GHS', 'KES', 'ZAR', 'USD'].includes(currencyCode))
+      return json({ error: 'Choose a valid business currency.' }, 400)
     const businessModes = businessMode === 'hybrid' ? ['retail', 'services'] : [businessMode]
     const slug = `${slugify(companyName)}-${crypto.randomUUID().slice(0, 8)}`
     const { data: organization, error: organizationError } = await adminClient
@@ -92,7 +129,13 @@ Deno.serve(async (request) => {
 
     const { data: store, error: storeError } = await adminClient
       .from('stores')
-      .insert({ organization_id: organization.id, name: branchName.trim(), currency_code: currencyCode, is_primary: true, status: 'active' })
+      .insert({
+        organization_id: organization.id,
+        name: branchName.trim(),
+        currency_code: currencyCode,
+        is_primary: true,
+        status: 'active',
+      })
       .select('id')
       .single()
     if (storeError || !store) {
@@ -101,8 +144,16 @@ Deno.serve(async (request) => {
     }
 
     const [{ error: subscriptionError }, { error: profileError }] = await Promise.all([
-      adminClient.from('organization_subscriptions').insert({ organization_id: organization.id, plan_code: 'starter', status: 'trial', trial_started_at: new Date().toISOString(), trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() }),
-      adminClient.from('profiles').insert({ id: user.id, store_id: store.id, full_name: fullName.trim(), role: 'admin' }),
+      adminClient.from('organization_subscriptions').insert({
+        organization_id: organization.id,
+        plan_code: 'starter',
+        status: 'trial',
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+      adminClient
+        .from('profiles')
+        .insert({ id: user.id, store_id: store.id, full_name: fullName.trim(), role: 'admin' }),
     ])
     if (subscriptionError || profileError) {
       await adminClient.from('organizations').delete().eq('id', organization.id)

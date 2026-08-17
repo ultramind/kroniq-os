@@ -1,4 +1,10 @@
-import { BankOutlined, BarChartOutlined, CustomerServiceOutlined, ShopOutlined, TeamOutlined } from '@ant-design/icons'
+import {
+  BankOutlined,
+  BarChartOutlined,
+  CustomerServiceOutlined,
+  ShopOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
 import { Button, Card, List, Progress, Statistic, Tag, Typography, message } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -9,13 +15,212 @@ type Store = { organization_id: string; status: string }
 type Subscription = { organization_id: string; plan_code: string; status: string }
 type Session = { id: string; organization_id: string; expires_at: string; ended_at?: string | null }
 
-export function PlatformDashboard({ organizations, stores, subscriptions }: { organizations: Organization[]; stores: Store[]; subscriptions: Subscription[] }) {
+export function PlatformDashboard({
+  organizations,
+  stores,
+  subscriptions,
+}: {
+  organizations: Organization[]
+  stores: Store[]
+  subscriptions: Subscription[]
+}) {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<Session[]>([])
   const [api, holder] = message.useMessage()
-  const loadSessions = useCallback(async () => { if (!supabase) return; const { data, error } = await supabase.from('platform_support_sessions').select('id,organization_id,expires_at,ended_at').is('ended_at', null); if (error && !error.message.includes('does not exist')) api.error(error.message); else setSessions((data ?? []) as Session[]) }, [api])
-  useEffect(() => { void loadSessions() }, [loadSessions])
-  const summary = useMemo(() => ({ active: organizations.filter((item) => item.status === 'active').length, trials: organizations.filter((item) => item.status === 'trial').length, activeStores: stores.filter((store) => store.status === 'active').length, activeSessions: sessions.filter((session) => new Date(session.expires_at) > new Date()).length }), [organizations, sessions, stores])
-  const plans = useMemo(() => Object.entries(subscriptions.reduce<Record<string, number>>((result, subscription) => ({ ...result, [subscription.plan_code]: (result[subscription.plan_code] ?? 0) + 1 }), {})).sort(([, left], [, right]) => right - left), [subscriptions])
-  return <section className="platform-dashboard"><div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between"><div className="min-w-0"><Typography.Title level={2} className="!mb-1 !text-2xl sm:!text-3xl">Platform dashboard</Typography.Title><Typography.Text type="secondary">A live operational view across Kroniq organisations.</Typography.Text></div><Button type="primary" className="w-full sm:w-auto" onClick={() => navigate('/platform/organisations')}>Manage organisations</Button></div>{holder}<div className="mb-5 grid grid-cols-2 gap-3 sm:mb-6 sm:gap-4 xl:grid-cols-4"><Card className="platform-stat-card"><Statistic title="Organisations" value={organizations.length} prefix={<BankOutlined />} /></Card><Card className="platform-stat-card"><Statistic title="Active organisations" value={summary.active} valueStyle={{ color: '#15803d' }} /></Card><Card className="platform-stat-card"><Statistic title="Active stores" value={summary.activeStores} prefix={<ShopOutlined />} /></Card><Card className="platform-stat-card"><Statistic title="Live support sessions" value={summary.activeSessions} prefix={<CustomerServiceOutlined />} /></Card></div><div className="grid gap-4 sm:gap-6 xl:grid-cols-2"><Card title="Organisation health" extra={<Button type="link" onClick={() => navigate('/platform/analytics')}>View analytics</Button>}><div className="space-y-4"><div><div className="mb-1 flex justify-between text-sm"><span>Active</span><span>{summary.active}</span></div><Progress percent={organizations.length ? Math.round((summary.active / organizations.length) * 100) : 0} showInfo={false} strokeColor="#0B1121" /></div><div><div className="mb-1 flex justify-between text-sm"><span>On trial</span><span>{summary.trials}</span></div><Progress percent={organizations.length ? Math.round((summary.trials / organizations.length) * 100) : 0} showInfo={false} strokeColor="#64748b" /></div></div></Card><Card title="Plan mix" extra={<Button type="link" onClick={() => navigate('/platform/plans')}>Plans</Button>}><List size="small" dataSource={plans} locale={{ emptyText: 'No subscriptions yet.' }} renderItem={([plan, count]) => <List.Item><Tag>{plan}</Tag><Typography.Text strong>{count} organisations</Typography.Text></List.Item>} /></Card><Card title="Recent organisations" extra={<Button type="link" onClick={() => navigate('/platform/organisations')}>All organisations</Button>}><List size="small" dataSource={[...organizations].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at)).slice(0, 5)} locale={{ emptyText: 'No organisations yet.' }} renderItem={(organization) => <List.Item actions={[<Button key="view" type="link" onClick={() => navigate(`/platform/organisations/${organization.id}`)}>View</Button>]}><List.Item.Meta className="min-w-0" title={<span className="block truncate">{organization.name}</span>} description={`Joined ${new Date(organization.created_at).toLocaleDateString('en-NG')}`} /><Tag>{organization.status}</Tag></List.Item>} /></Card><Card title="Platform quick actions"><div className="grid grid-cols-2 gap-3"><Button className="!h-auto !min-h-12 !whitespace-normal" icon={<CustomerServiceOutlined />} onClick={() => navigate('/platform/support')}>Support & safety</Button><Button className="!h-auto !min-h-12 !whitespace-normal" icon={<BarChartOutlined />} onClick={() => navigate('/platform/audit')}>Review audit log</Button><Button className="!h-auto !min-h-12 !whitespace-normal" icon={<TeamOutlined />} onClick={() => navigate('/platform/team')}>Platform team</Button><Button className="!h-auto !min-h-12 !whitespace-normal" onClick={() => navigate('/platform/status')}>System status</Button></div></Card></div></section>
+  const loadSessions = useCallback(async () => {
+    if (!supabase) return
+    const { data, error } = await supabase
+      .from('platform_support_sessions')
+      .select('id,organization_id,expires_at,ended_at')
+      .is('ended_at', null)
+    if (error && !error.message.includes('does not exist')) api.error(error.message)
+    else setSessions((data ?? []) as Session[])
+  }, [api])
+  useEffect(() => {
+    void loadSessions()
+  }, [loadSessions])
+  const summary = useMemo(
+    () => ({
+      active: organizations.filter((item) => item.status === 'active').length,
+      trials: organizations.filter((item) => item.status === 'trial').length,
+      activeStores: stores.filter((store) => store.status === 'active').length,
+      activeSessions: sessions.filter((session) => new Date(session.expires_at) > new Date()).length,
+    }),
+    [organizations, sessions, stores],
+  )
+  const plans = useMemo(
+    () =>
+      Object.entries(
+        subscriptions.reduce<Record<string, number>>(
+          (result, subscription) => ({
+            ...result,
+            [subscription.plan_code]: (result[subscription.plan_code] ?? 0) + 1,
+          }),
+          {},
+        ),
+      ).sort(([, left], [, right]) => right - left),
+    [subscriptions],
+  )
+  return (
+    <section className="platform-dashboard">
+      <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <Typography.Title level={2} className="!mb-1 !text-2xl sm:!text-3xl">
+            Platform dashboard
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            A live operational view across Kroniq organisations.
+          </Typography.Text>
+        </div>
+        <Button
+          type="primary"
+          className="w-full sm:w-auto"
+          onClick={() => navigate('/platform/organisations')}
+        >
+          Manage organisations
+        </Button>
+      </div>
+      {holder}
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:mb-6 sm:gap-4 xl:grid-cols-4">
+        <Card className="platform-stat-card">
+          <Statistic title="Organisations" value={organizations.length} prefix={<BankOutlined />} />
+        </Card>
+        <Card className="platform-stat-card">
+          <Statistic title="Active organisations" value={summary.active} valueStyle={{ color: '#15803d' }} />
+        </Card>
+        <Card className="platform-stat-card">
+          <Statistic title="Active stores" value={summary.activeStores} prefix={<ShopOutlined />} />
+        </Card>
+        <Card className="platform-stat-card">
+          <Statistic
+            title="Live support sessions"
+            value={summary.activeSessions}
+            prefix={<CustomerServiceOutlined />}
+          />
+        </Card>
+      </div>
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-2">
+        <Card
+          title="Organisation health"
+          extra={
+            <Button type="link" onClick={() => navigate('/platform/analytics')}>
+              View analytics
+            </Button>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <div className="mb-1 flex justify-between text-sm">
+                <span>Active</span>
+                <span>{summary.active}</span>
+              </div>
+              <Progress
+                percent={organizations.length ? Math.round((summary.active / organizations.length) * 100) : 0}
+                showInfo={false}
+                strokeColor="#0B1121"
+              />
+            </div>
+            <div>
+              <div className="mb-1 flex justify-between text-sm">
+                <span>On trial</span>
+                <span>{summary.trials}</span>
+              </div>
+              <Progress
+                percent={organizations.length ? Math.round((summary.trials / organizations.length) * 100) : 0}
+                showInfo={false}
+                strokeColor="#64748b"
+              />
+            </div>
+          </div>
+        </Card>
+        <Card
+          title="Plan mix"
+          extra={
+            <Button type="link" onClick={() => navigate('/platform/plans')}>
+              Plans
+            </Button>
+          }
+        >
+          <List
+            size="small"
+            dataSource={plans}
+            locale={{ emptyText: 'No subscriptions yet.' }}
+            renderItem={([plan, count]) => (
+              <List.Item>
+                <Tag>{plan}</Tag>
+                <Typography.Text strong>{count} organisations</Typography.Text>
+              </List.Item>
+            )}
+          />
+        </Card>
+        <Card
+          title="Recent organisations"
+          extra={
+            <Button type="link" onClick={() => navigate('/platform/organisations')}>
+              All organisations
+            </Button>
+          }
+        >
+          <List
+            size="small"
+            dataSource={[...organizations]
+              .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+              .slice(0, 5)}
+            locale={{ emptyText: 'No organisations yet.' }}
+            renderItem={(organization) => (
+              <List.Item
+                actions={[
+                  <Button
+                    key="view"
+                    type="link"
+                    onClick={() => navigate(`/platform/organisations/${organization.id}`)}
+                  >
+                    View
+                  </Button>,
+                ]}
+              >
+                <List.Item.Meta
+                  className="min-w-0"
+                  title={<span className="block truncate">{organization.name}</span>}
+                  description={`Joined ${new Date(organization.created_at).toLocaleDateString('en-NG')}`}
+                />
+                <Tag>{organization.status}</Tag>
+              </List.Item>
+            )}
+          />
+        </Card>
+        <Card title="Platform quick actions">
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              className="!h-auto !min-h-12 !whitespace-normal"
+              icon={<CustomerServiceOutlined />}
+              onClick={() => navigate('/platform/support')}
+            >
+              Support & safety
+            </Button>
+            <Button
+              className="!h-auto !min-h-12 !whitespace-normal"
+              icon={<BarChartOutlined />}
+              onClick={() => navigate('/platform/audit')}
+            >
+              Review audit log
+            </Button>
+            <Button
+              className="!h-auto !min-h-12 !whitespace-normal"
+              icon={<TeamOutlined />}
+              onClick={() => navigate('/platform/team')}
+            >
+              Platform team
+            </Button>
+            <Button
+              className="!h-auto !min-h-12 !whitespace-normal"
+              onClick={() => navigate('/platform/status')}
+            >
+              System status
+            </Button>
+          </div>
+        </Card>
+      </div>
+    </section>
+  )
 }

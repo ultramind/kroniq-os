@@ -3,11 +3,88 @@ import { Button, Card, List, Statistic, Typography } from 'antd'
 import type { Product, Role } from '../../types'
 
 const { Text } = Typography
-type Props = { products: Product[]; role: Role; onAdjustProduct: (product: Product) => void; onCountProduct: (product: Product) => void }
+type Props = {
+  products: Product[]
+  role: Role
+  onAdjustProduct: (product: Product) => void
+  onCountProduct: (product: Product) => void
+}
 export function InventoryOverview({ products, role, onAdjustProduct, onCountProduct }: Props) {
-  const savedSettings = JSON.parse(localStorage.getItem('naira-pos-settings') ?? '{}') as { lowStock?: number }
+  const savedSettings = JSON.parse(localStorage.getItem('naira-pos-settings') ?? '{}') as {
+    lowStock?: number
+  }
   const lowStockThreshold = Number(savedSettings.lowStock ?? 10)
-  const needsAttention = products.filter((product) => product.stock <= (product.lowStockThreshold ?? lowStockThreshold))
+  const needsAttention = products.filter(
+    (product) => product.stock <= (product.lowStockThreshold ?? lowStockThreshold),
+  )
   const lowStock = needsAttention.length
-  return <Card className="overflow-hidden border-0 shadow-sm" bodyStyle={{ padding: 0 }}><div className="bg-gradient-to-r from-[#102417] to-[#1b5235] px-6 py-5 text-white"><div className="flex items-start justify-between gap-4"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-emerald-200">Inventory control</p><h2 className="mb-0 text-2xl font-semibold">Stock health</h2><p className="mb-0 mt-1 text-sm text-emerald-100/75">Monitor items that need a count or adjustment.</p></div><div className="rounded-xl bg-white/10 px-4 py-2 text-right"><p className="mb-0 text-xs text-emerald-100">Active products</p><p className="mb-0 text-2xl font-semibold">{products.length}</p></div></div></div><div className="grid gap-5 p-6 lg:grid-cols-[220px_minmax(0,1fr)]"><div className={`rounded-xl p-5 ${lowStock ? 'bg-amber-50' : 'bg-emerald-50'}`}><div className="flex items-center gap-2"><ExclamationCircleOutlined className={lowStock ? 'text-amber-600' : 'text-emerald-600'} /><Text strong>Attention needed</Text></div><Statistic className="mt-3" value={lowStock} valueStyle={{ fontSize: 34, color: lowStock ? '#d46b08' : '#167843' }} suffix={<span className="text-sm font-normal text-slate-500">products</span>} /><Text type="secondary" className="mt-1 block text-xs">Based on each product’s alert level.</Text></div>{role !== 'cashier' && <div><Text strong className="mb-2 block">Low-stock queue</Text><List size="small" dataSource={needsAttention.slice(0, 4)} locale={{ emptyText: 'All products are above their alert quantities.' }} renderItem={(product) => <List.Item actions={[<Button key="count" type="link" size="small" onClick={() => onCountProduct(product)}>Count</Button>, <Button key="adjust" type="link" size="small" onClick={() => onAdjustProduct(product)}>Adjust</Button>]}><span>{product.name} <Text type="danger">{product.stock} in stock · alert at {product.lowStockThreshold ?? lowStockThreshold}</Text></span></List.Item>} /></div>}</div></Card>
+  return (
+    <Card className="overflow-hidden border-0 shadow-sm" bodyStyle={{ padding: 0 }}>
+      <div className="bg-gradient-to-r from-[#102417] to-[#1b5235] px-6 py-5 text-white">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-emerald-200">
+              Inventory control
+            </p>
+            <h2 className="mb-0 text-2xl font-semibold">Stock health</h2>
+            <p className="mb-0 mt-1 text-sm text-emerald-100/75">
+              Monitor items that need a count or adjustment.
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/10 px-4 py-2 text-right">
+            <p className="mb-0 text-xs text-emerald-100">Active products</p>
+            <p className="mb-0 text-2xl font-semibold">{products.length}</p>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-5 p-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className={`rounded-xl p-5 ${lowStock ? 'bg-amber-50' : 'bg-emerald-50'}`}>
+          <div className="flex items-center gap-2">
+            <ExclamationCircleOutlined className={lowStock ? 'text-amber-600' : 'text-emerald-600'} />
+            <Text strong>Attention needed</Text>
+          </div>
+          <Statistic
+            className="mt-3"
+            value={lowStock}
+            valueStyle={{ fontSize: 34, color: lowStock ? '#d46b08' : '#167843' }}
+            suffix={<span className="text-sm font-normal text-slate-500">products</span>}
+          />
+          <Text type="secondary" className="mt-1 block text-xs">
+            Based on each product’s alert level.
+          </Text>
+        </div>
+        {role !== 'cashier' && (
+          <div>
+            <Text strong className="mb-2 block">
+              Low-stock queue
+            </Text>
+            <List
+              size="small"
+              dataSource={needsAttention.slice(0, 4)}
+              locale={{ emptyText: 'All products are above their alert quantities.' }}
+              renderItem={(product) => (
+                <List.Item
+                  actions={[
+                    <Button key="count" type="link" size="small" onClick={() => onCountProduct(product)}>
+                      Count
+                    </Button>,
+                    <Button key="adjust" type="link" size="small" onClick={() => onAdjustProduct(product)}>
+                      Adjust
+                    </Button>,
+                  ]}
+                >
+                  <span>
+                    {product.name}{' '}
+                    <Text type="danger">
+                      {product.stock} in stock · alert at {product.lowStockThreshold ?? lowStockThreshold}
+                    </Text>
+                  </span>
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
+      </div>
+    </Card>
+  )
 }

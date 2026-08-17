@@ -15,14 +15,19 @@ const sharedTokens = {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(() => (localStorage.getItem('naira-pos-theme') as ThemeMode) || 'light')
+  const [mode, setMode] = useState<ThemeMode>(
+    () => (localStorage.getItem('naira-pos-theme') as ThemeMode) || 'light',
+  )
 
   useEffect(() => {
     document.documentElement.dataset.theme = mode
     localStorage.setItem('naira-pos-theme', mode)
   }, [mode])
 
-  const value = useMemo(() => ({ mode, toggleTheme: () => setMode((current) => current === 'light' ? 'dark' : 'light') }), [mode])
+  const value = useMemo(
+    () => ({ mode, toggleTheme: () => setMode((current) => (current === 'light' ? 'dark' : 'light')) }),
+    [mode],
+  )
   const isDark = mode === 'dark'
 
   return (
@@ -41,9 +46,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             colorBorder: isDark ? '#27272a' : '#e4e4e7',
           },
           components: {
-            Layout: { bodyBg: isDark ? '#09090b' : '#fafafa', headerBg: isDark ? '#09090b' : '#ffffff', siderBg: isDark ? '#111113' : '#ffffff' },
+            Layout: {
+              bodyBg: isDark ? '#09090b' : '#fafafa',
+              headerBg: isDark ? '#09090b' : '#ffffff',
+              siderBg: isDark ? '#111113' : '#ffffff',
+            },
             Menu: isDark
-              ? { darkItemBg: '#111113', darkSubMenuItemBg: '#111113', darkItemSelectedBg: '#27272a', darkItemHoverBg: '#1f1f22' }
+              ? {
+                  darkItemBg: '#111113',
+                  darkSubMenuItemBg: '#111113',
+                  darkItemSelectedBg: '#27272a',
+                  darkItemHoverBg: '#1f1f22',
+                }
               : { itemSelectedBg: '#e8edf5', itemHoverBg: '#f1f5f9', itemSelectedColor: '#0B1121' },
             Button: { controlHeight: 40, primaryShadow: '0 6px 18px rgb(124 58 237 / 22%)' },
             Card: { colorBgContainer: isDark ? '#111113' : '#ffffff' },

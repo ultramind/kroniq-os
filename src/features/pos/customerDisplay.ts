@@ -29,7 +29,9 @@ export function readCustomerDisplay(): CustomerDisplayState {
   try {
     const value = localStorage.getItem(storageKey)
     if (value) return JSON.parse(value) as CustomerDisplayState
-  } catch { /* A blank customer screen is safer than a broken checkout. */ }
+  } catch {
+    /* A blank customer screen is safer than a broken checkout. */
+  }
   return { cart: [], total: 0, paymentMethod: 'cash', updatedAt: new Date().toISOString() }
 }
 
@@ -38,7 +40,11 @@ export function subscribeToCustomerDisplay(onUpdate: (state: CustomerDisplayStat
   if (channel) channel.onmessage = (event: MessageEvent<CustomerDisplayState>) => onUpdate(event.data)
   const onStorage = (event: StorageEvent) => {
     if (event.key === storageKey && event.newValue) {
-      try { onUpdate(JSON.parse(event.newValue) as CustomerDisplayState) } catch { /* Ignore malformed stale data. */ }
+      try {
+        onUpdate(JSON.parse(event.newValue) as CustomerDisplayState)
+      } catch {
+        /* Ignore malformed stale data. */
+      }
     }
   }
   window.addEventListener('storage', onStorage)

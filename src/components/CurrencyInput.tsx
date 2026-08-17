@@ -8,12 +8,15 @@ export function CurrencyInput({ formatter, parser, prefix, ...props }: CurrencyI
     <InputNumber
       {...props}
       prefix={prefix ?? '₦'}
-      formatter={formatter ?? ((value) => {
-        if (value === undefined || value === null) return ''
-        const [whole, decimal] = String(value).split('.')
-        const grouped = Number(whole || 0).toLocaleString('en-NG')
-        return decimal === undefined ? grouped : `${grouped}.${decimal}`
-      })}
+      formatter={
+        formatter ??
+        ((value) => {
+          if (value === undefined || value === null) return ''
+          const [whole, decimal] = String(value).split('.')
+          const grouped = Number(whole || 0).toLocaleString('en-NG')
+          return decimal === undefined ? grouped : `${grouped}.${decimal}`
+        })
+      }
       parser={parser ?? ((value) => Number((value ?? '').replace(/[^0-9.-]/g, '')))}
     />
   )
