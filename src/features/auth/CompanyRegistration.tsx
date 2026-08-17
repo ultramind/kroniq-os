@@ -23,7 +23,10 @@ export function CompanyRegistration({ onBack, onSignedIn }: { onBack: () => void
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { full_name: fullName.trim() } },
+      options: {
+        data: { full_name: fullName.trim() },
+        emailRedirectTo: `${window.location.origin}/onboarding`,
+      },
     })
     setSaving(false)
     if (error) {

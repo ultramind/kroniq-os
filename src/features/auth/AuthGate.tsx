@@ -12,6 +12,7 @@ import { clearLocalPosDataForNewTenant } from '../../db'
 import { PlatformAccessDenied, PlatformApp } from '../platform/PlatformApp'
 import { BillingPanel } from '../billing/BillingPanel'
 import { MarketingSite } from '../marketing/MarketingSite'
+import { StorefrontPage } from '../../pages/StorefrontPage'
 import { useTheme } from '../../app/theme'
 import { pullProducts } from '../../sync'
 
@@ -20,6 +21,7 @@ export function AuthGate() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const platformRoute = pathname.startsWith('/platform')
+  const publicStorefrontRoute = pathname.startsWith('/shop/')
   const publicMarketingRoute =
     pathname === '/' ||
     pathname === '/product' ||
@@ -44,6 +46,10 @@ export function AuthGate() {
     staffName?: string
   }>({ loading: true })
   useEffect(() => {
+    if (publicStorefrontRoute) {
+      setState({ loading: false })
+      return
+    }
     if (!supabase) {
       setState({ loading: false })
       return
@@ -110,7 +116,8 @@ export function AuthGate() {
     void load()
     const { data: listener } = client.auth.onAuthStateChange((event) => void load(event === 'SIGNED_IN'))
     return () => listener.subscription.unsubscribe()
-  }, [navigate, platformRoute])
+  }, [navigate, platformRoute, publicStorefrontRoute])
+  if (publicStorefrontRoute) return <StorefrontPage />
   if (state.loading)
     return (
       <main
