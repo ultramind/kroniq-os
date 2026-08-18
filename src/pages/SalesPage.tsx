@@ -1,5 +1,6 @@
-import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'
-import { Button, Card, DatePicker, Select, Space, Statistic } from 'antd'
+import { DownloadOutlined, PrinterOutlined, UploadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, DatePicker, Select, Space, Statistic } from 'antd'
+import dayjs from 'dayjs'
 import { useMemo, useState } from 'react'
 import { exportSalesCsv } from '../features/sales/exportSalesCsv'
 import { PartialReturnModal } from '../features/sales/PartialReturnModal'
@@ -18,6 +19,20 @@ type Props = {
   role: Role
   onViewReceipt: (sale: Sale) => void
   onReturnSale: (sale: Sale, selected: Array<{ item: SaleItem; quantity: number }>) => void
+  onRetryStockConflict: (saleId: string) => Promise<void>
+}
+
+type Period = 'day' | 'week' | 'month' | 'year'
+
+function rangeFor(period: Period, anchor: string) {
+  const date = dayjs(anchor)
+  if (period === 'week') {
+    const start = date.startOf('week').add(1, 'day')
+    return { start, end: start.add(6, 'day') }
+  }
+  if (period === 'month') return { start: date.startOf('month'), end: date.endOf('month') }
+  if (period === 'year') return { start: date.startOf('year'), end: date.endOf('year') }
+  return { start: date.startOf('day'), end: date.endOf('day') }
 }
 
 export function SalesPage({
@@ -27,20 +42,24 @@ export function SalesPage({
   role,
   onViewReceipt,
   onReturnSale,
+  onRetryStockConflict,
 }: Props) {
   const [method, setMethod] = useState<string>('all')
-  const [date, setDate] = useState<string>()
+  const [date, setDate] = useState<string>(() => dayjs().format('YYYY-MM-DD'))
+  const [period, setPeriod] = useState<Period>('day')
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const [returningSale, setReturningSale] = useState<Sale>()
   const [bulkOpen, setBulkOpen] = useState(false)
+  const { start, end } = useMemo(() => rangeFor(period, date), [date, period])
   const filtered = useMemo(
     () =>
       allSales.filter(
         (sale) =>
           (method === 'all' || sale.paymentMethod === method) &&
-          (!date || sale.createdAt.slice(0, 10) === date),
+          sale.createdAt.slice(0, 10) >= start.format('YYYY-MM-DD') &&
+          sale.createdAt.slice(0, 10) <= end.format('YYYY-MM-DD'),
       ),
-    [allSales, method, date],
+    [allSales, method, start, end],
   )
   const shown = filtered
     .slice()
@@ -48,14 +67,9 @@ export function SalesPage({
       sort === 'newest' ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt),
     )
     .slice(0, 20)
-  const total = filtered
-    .filter((sale) => sale.status !== 'returned')
-    .reduce((sum, sale) => sum + sale.total, 0)
-  const today = new Date().toISOString().slice(0, 10)
-  const todaySales = allSales.filter(
-    (sale) => sale.createdAt.slice(0, 10) === today && sale.status !== 'returned',
-  )
-  const todayTotal = todaySales.reduce((sum, sale) => sum + sale.total, 0)
+  const reportSales = filtered.filter((sale) => sale.status !== 'returned')
+  const stockConflicts = allSales.filter((sale) => sale.syncStatus === 'stock_conflict')
+  const total = reportSales.reduce((sum, sale) => sum + sale.total, 0)
   async function importSales(rows: CsvRow[]) {
     if (!supabase) throw new Error('Sales import requires Supabase to be configured.')
     if (role === 'cashier') throw new Error('Only managers and admins can import historical sales.')
@@ -124,44 +138,90 @@ export function SalesPage({
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
+          <Statistic title="Sales total" value={total} formatter={(value) => formatNaira(Number(value))} />
+        </Card>
+        <Card>
+          <Statistic title="Transactions" value={reportSales.length} />
+        </Card>
+        <Card>
           <Statistic
-            title="Today's sales"
-            value={todayTotal}
+            title="Average sale"
+            value={reportSales.length ? total / reportSales.length : 0}
             formatter={(value) => formatNaira(Number(value))}
           />
         </Card>
         <Card>
-          <Statistic title="Today's transactions" value={todaySales.length} />
-        </Card>
-        <Card>
-          <Statistic title="Filtered total" value={total} formatter={(value) => formatNaira(Number(value))} />
-        </Card>
-        <Card>
-          <Statistic title="Pending sync" value={filtered.filter((sale) => !sale.synced).length} />
+          <Statistic title="Pending sync" value={reportSales.filter((sale) => !sale.synced).length} />
         </Card>
       </div>
+      {stockConflicts.length > 0 && (
+        <Card title="Stock conflicts requiring review">
+          <Alert
+            type="warning"
+            showIcon
+            message="These sales were completed offline after stock changed on another device. They are safely stored, but cannot sync until stock is corrected."
+          />
+          <div className="mt-4 space-y-3">
+            {stockConflicts.map((sale) => (
+              <div
+                key={sale.id}
+                className="flex flex-wrap items-center justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
+              >
+                <div>
+                  <p className="mb-0 font-medium">{sale.receiptNo}</p>
+                  <p className="mb-0 text-xs text-slate-500">{sale.syncError}</p>
+                </div>
+                {role !== 'cashier' && (
+                  <Button type="primary" onClick={() => void onRetryStockConflict(sale.id)}>
+                    Retry after stock update
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       <Card
         title="Sales filters"
         extra={
-          role !== 'cashier' && (
-            <Space>
-              <Button icon={<UploadOutlined />} onClick={() => setBulkOpen(true)}>
-                Bulk upload
-              </Button>
-              <Button type="primary" icon={<DownloadOutlined />} onClick={() => exportSalesCsv(filtered)}>
-                Export CSV
-              </Button>
-            </Space>
-          )
+          <Space>
+            <Button icon={<PrinterOutlined />} onClick={() => window.print()}>
+              Print
+            </Button>
+            {role !== 'cashier' && (
+              <>
+                <Button icon={<UploadOutlined />} onClick={() => setBulkOpen(true)}>
+                  Bulk upload
+                </Button>
+                <Button type="primary" icon={<DownloadOutlined />} onClick={() => exportSalesCsv(filtered)}>
+                  Export CSV
+                </Button>
+              </>
+            )}
+          </Space>
         }
       >
         <Space wrap>
+          <Select
+            value={period}
+            size="large"
+            className="w-32"
+            onChange={setPeriod}
+            options={[
+              { value: 'day', label: 'Today' },
+              { value: 'week', label: 'This week' },
+              { value: 'month', label: 'This month' },
+              { value: 'year', label: 'This year' },
+            ]}
+          />
           <DatePicker
-            value={date ? undefined : undefined}
-            onChange={(_, value) => setDate(value || undefined)}
+            size="large"
+            value={date ? dayjs(date) : null}
+            onChange={(_, value) => setDate(value || dayjs().format('YYYY-MM-DD'))}
           />
           <Select
             value={method}
+            size="large"
             className="w-44"
             onChange={setMethod}
             options={[
@@ -169,11 +229,12 @@ export function SalesPage({
               { value: 'cash', label: 'Cash' },
               { value: 'card', label: 'Card / POS' },
               { value: 'transfer', label: 'Transfer' },
-              { value: 'credit', label: 'Mobile money' },
+              { value: 'credit', label: 'Credit' },
             ]}
           />
           <Select
             value={sort}
+            size="large"
             className="w-40"
             onChange={setSort}
             options={[
@@ -182,9 +243,11 @@ export function SalesPage({
             ]}
           />
           <Button
+            size="large"
             onClick={() => {
               setMethod('all')
-              setDate(undefined)
+              setDate(dayjs().format('YYYY-MM-DD'))
+              setPeriod('day')
               setSort('newest')
             }}
           >
@@ -214,6 +277,40 @@ export function SalesPage({
         guidance="Use one row per item. Lines with the same receipt_no become one historical sale. unit_price and initial_payment are in Naira. Set deduct_stock to yes only when the past sale should correct current stock."
         onImport={importSales}
       />
+      <section id="sales-report" className="hidden">
+        <h1>Sales report</h1>
+        <p>
+          {period === 'day'
+            ? `Date: ${dayjs(date).format('DD MMM YYYY')}`
+            : `${start.format('DD MMM YYYY')} – ${end.format('DD MMM YYYY')}`}{' '}
+          · {method === 'all' ? 'All payment methods' : method.replace('_', ' ')}
+        </p>
+        <p>
+          Transactions: {reportSales.length} · Sales total: {formatNaira(total)}
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Receipt</th>
+              <th>Date</th>
+              <th>Payment</th>
+              <th>Status</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reportSales.map((sale) => (
+              <tr key={sale.id}>
+                <td>{sale.receiptNo}</td>
+                <td>{new Date(sale.createdAt).toLocaleString('en-NG')}</td>
+                <td>{sale.paymentMethod.replace('_', ' ')}</td>
+                <td>{sale.synced ? 'Synced' : 'Queued'}</td>
+                <td>{formatNaira(sale.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
     </div>
   )
 }

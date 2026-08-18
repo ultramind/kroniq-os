@@ -6,6 +6,8 @@ type OfflineWorkspace = {
   userId: string
   role: Role
   staffName?: string
+  tenantName?: string
+  tenantLogoUrl?: string
   savedAt: string
 }
 

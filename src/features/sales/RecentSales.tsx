@@ -35,6 +35,8 @@ export function RecentSales({ sales, role, onViewReceipt, onReturnSale }: Props)
       render: (_: unknown, sale: Sale) =>
         sale.status === 'returned' ? (
           <Tag color="red">Returned</Tag>
+        ) : sale.syncStatus === 'stock_conflict' ? (
+          <Tag color="warning">Stock review</Tag>
         ) : sale.historical ? (
           <Tag color="blue">Historical</Tag>
         ) : (
@@ -49,6 +51,9 @@ export function RecentSales({ sales, role, onViewReceipt, onReturnSale }: Props)
           <Button type="link" size="small" onClick={() => onViewReceipt(sale)}>
             Receipt
           </Button>
+          {role !== 'cashier' && sale.syncStatus === 'stock_conflict' && (
+            <Tag color="warning">Restock, then retry in Sales</Tag>
+          )}
           {role !== 'cashier' && sale.synced && !sale.historical && sale.status !== 'returned' && (
             <Button type="link" danger size="small" onClick={() => onReturnSale(sale)}>
               Return items

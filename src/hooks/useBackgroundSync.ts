@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { pullProducts, pullSales, syncOutbox } from '../sync'
 
+async function withTimeout<T>(request: Promise<T>, label: string): Promise<T> {
+  return await Promise.race([
+    request,
+    new Promise<never>((_, reject) =>
+      window.setTimeout(() => reject(new Error(`${label} timed out. It will retry automatically.`)), 15_000),
+    ),
+  ])
+}
+
 export function useBackgroundSync(onSynced: (count: number) => void, onError: (message?: string) => void) {
   const runningRef = useRef(false)
   const run = useCallback(async () => {
@@ -9,8 +18,11 @@ export function useBackgroundSync(onSynced: (count: number) => void, onError: (m
     try {
       // Push local sales before refreshing catalogue data, so an intermittent PWA
       // connection cannot overwrite the local view during a pending checkout.
-      const result = await syncOutbox()
-      const [products, sales] = await Promise.all([pullProducts(), pullSales()])
+      const result = await withTimeout(syncOutbox(), 'Sale sync')
+      const [products, sales] = await Promise.all([
+        withTimeout(pullProducts(), 'Catalogue refresh'),
+        withTimeout(pullSales(), 'Sales refresh'),
+      ])
       if (result.error || products.error || sales.error)
         onError(result.error ?? products.error ?? sales.error)
       else onError(undefined)

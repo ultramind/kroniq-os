@@ -871,15 +871,46 @@ html:has([data-theme='dark']),
   #credit-payment-history,
   #credit-payment-history *,
   #end-of-day-report,
-  #end-of-day-report * {
+  #end-of-day-report *,
+  #sales-report,
+  #sales-report * {
     visibility: visible;
   }
   #receipt,
   #credit-payment-history,
-  #end-of-day-report {
+  #end-of-day-report,
+  #sales-report {
     position: absolute;
     inset: 0;
     width: 100%;
     max-width: none;
+  }
+  #sales-report {
+    display: block !important;
+    color: #111827;
+    font-family: Arial, sans-serif;
+  }
+  #sales-report h1 {
+    margin: 0 0 8px;
+    font-size: 22px;
+  }
+  #sales-report p {
+    margin: 0 0 8px;
+    font-size: 12px;
+  }
+  #sales-report table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  #sales-report th,
+  #sales-report td {
+    padding: 7px 5px;
+    border-bottom: 1px solid #d1d5db;
+    text-align: left;
+  }
+  #sales-report th:last-child,
+  #sales-report td:last-child {
+    text-align: right;
   }
 }

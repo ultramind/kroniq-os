@@ -76,6 +76,8 @@ export interface Sale {
   createdAt: string
   cashier: string
   synced: boolean
+  syncStatus?: 'queued' | 'stock_conflict'
+  syncError?: string
   historical?: boolean
   discount?: number
   discountReason?: string
@@ -161,7 +163,7 @@ export interface InventoryLocation {
 export interface SyncEvent {
   id?: number
   entity: 'sale' | 'stock_movement' | 'stock_delivery' | 'sale_return' | 'shift_open' | 'shift_close'
-  action: 'create'
+  action: 'create' | 'conflict'
   payload: unknown
   createdAt: string
 }

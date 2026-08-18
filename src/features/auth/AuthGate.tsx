@@ -45,6 +45,8 @@ export function AuthGate() {
     billingBlocked?: boolean
     role?: Role
     staffName?: string
+    tenantName?: string
+    tenantLogoUrl?: string
   }>({ loading: true })
   useEffect(() => {
     if (publicStorefrontRoute) {
@@ -77,12 +79,20 @@ export function AuthGate() {
           return
         }
         const cachedWorkspace = getOfflineWorkspace(session.user.id)
+        if (cachedWorkspace?.tenantName)
+          setState((current) => ({
+            ...current,
+            tenantName: cachedWorkspace.tenantName,
+            tenantLogoUrl: cachedWorkspace.tenantLogoUrl,
+          }))
         if (!platformRoute && !navigator.onLine) {
           if (cachedWorkspace) {
             setState({
               loading: false,
               role: cachedWorkspace.role,
               staffName: cachedWorkspace.staffName,
+              tenantName: cachedWorkspace.tenantName,
+              tenantLogoUrl: cachedWorkspace.tenantLogoUrl,
             })
             return
           }
@@ -101,7 +111,7 @@ export function AuthGate() {
           return
         }
         const { data, error } = await within(
-          client.from('profiles').select('role, full_name').eq('id', session.user.id).maybeSingle(),
+          client.from('profiles').select('role, full_name, store_id').eq('id', session.user.id).maybeSingle(),
           'Workspace profile check',
         )
         if (error) {
@@ -123,18 +133,50 @@ export function AuthGate() {
           setState({ loading: false, onboarding: true })
           return
         }
-        saveOfflineWorkspace({ userId: session.user.id, role: data.role, staffName: data.full_name })
+        let tenantName = cachedWorkspace?.tenantName
+        let tenantLogoUrl = cachedWorkspace?.tenantLogoUrl
+        if (data.store_id) {
+          const [{ data: store }, { data: brand }] = await Promise.all([
+            client.from('stores').select('organization_id').eq('id', data.store_id).maybeSingle(),
+            client.rpc('current_store_invoice_brand').maybeSingle(),
+          ])
+          const invoiceBrand = brand as { company_name?: string | null; logo_url?: string | null } | null
+          if (invoiceBrand?.company_name) tenantName = invoiceBrand.company_name
+          if (invoiceBrand?.logo_url) tenantLogoUrl = invoiceBrand.logo_url
+          if (store?.organization_id) {
+            const { data: organization } = await client
+              .from('organizations')
+              .select('name')
+              .eq('id', store.organization_id)
+              .maybeSingle()
+            tenantName = invoiceBrand?.company_name ?? organization?.name ?? tenantName
+          }
+        }
+        saveOfflineWorkspace({
+          userId: session.user.id,
+          role: data.role,
+          staffName: data.full_name,
+          tenantName,
+          tenantLogoUrl,
+        })
         const { data: billing } = (await within(
           client.rpc('current_organization_billing_status').maybeSingle(),
           'Subscription check',
         )) as { data: { organization_status?: string } | null }
         if (billing?.organization_status === 'suspended') {
-          setState({ loading: false, billingBlocked: true, role: data.role, staffName: data.full_name })
+          setState({
+            loading: false,
+            billingBlocked: true,
+            role: data.role,
+            staffName: data.full_name,
+            tenantName,
+            tenantLogoUrl,
+          })
           return
         }
         if (data.role === 'cashier' && navigator.onLine) await within(pullProducts(), 'Checkout catalogue')
         if (redirectToDefault) navigate(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
-        setState({ loading: false, role: data.role, staffName: data.full_name })
+        setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
       } catch (error) {
         const {
           data: { session },
@@ -145,6 +187,8 @@ export function AuthGate() {
             loading: false,
             role: cachedWorkspace.role,
             staffName: cachedWorkspace.staffName,
+            tenantName: cachedWorkspace.tenantName,
+            tenantLogoUrl: cachedWorkspace.tenantLogoUrl,
           })
           return
         }
@@ -166,18 +210,25 @@ export function AuthGate() {
       >
         <div className="relative w-full max-w-sm text-center">
           <div className="kroniq-loader-orb absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2" />
-          <Typography.Title level={3} className="kroniq-loader-title relative !mb-2">
-            Kroniqos
+          {state.tenantLogoUrl ? (
+            <img
+              src={state.tenantLogoUrl}
+              alt="Company logo"
+              className="relative mx-auto mb-4 h-12 w-12 object-contain"
+            />
+          ) : null}
+          <Typography.Title level={3} className="kroniq-loader-title relative !mb-1 !text-xl">
+            {state.tenantName ?? 'Kroniqos'}
           </Typography.Title>
           <Typography.Text className="kroniq-loader-subtitle relative">
-            Preparing your workspace
+            Loading workspace securely
           </Typography.Text>
-          <div className="kroniq-loader-track relative mx-auto mt-7 h-px w-44 overflow-hidden">
+          <div className="kroniq-loader-track relative mx-auto mt-4 h-px w-44 overflow-hidden">
             <span className="kroniq-loader-line block h-full w-1/2" />
           </div>
-          <div className="kroniq-loader-status relative mt-4 flex items-center justify-center gap-2 text-[11px]">
+          <div className="kroniq-loader-status relative mt-2 flex items-center justify-center gap-2 text-[11px]">
             <CloudSyncOutlined className="kroniq-loader-spin" />
-            Checking your secure workspace
+            Powered by Kroniqos
           </div>
         </div>
       </main>

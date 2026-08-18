@@ -141,6 +141,24 @@ export function App({
     [api],
   )
   const retrySync = useBackgroundSync(notifySynced, setSyncError)
+  async function retryStockConflict(saleId: string) {
+    const event = await db.outbox
+      .filter((item) => {
+        if (item.entity !== 'sale' || item.action !== 'conflict') return false
+        const payload = item.payload as { sale?: Sale }
+        return payload.sale?.id === saleId
+      })
+      .first()
+    if (!event?.id) {
+      api.error('This stock conflict is no longer available on this device.')
+      return
+    }
+    await db.transaction('rw', db.sales, db.outbox, async () => {
+      await db.sales.update(saleId, { syncStatus: 'queued', syncError: '' })
+      await db.outbox.update(event.id!, { action: 'create' })
+    })
+    await retrySync()
+  }
   const visibleProducts = useMemo(
     () =>
       products.filter(
@@ -568,6 +586,7 @@ export function App({
                 role={state.role}
                 onViewReceipt={(sale) => void viewReceipt(sale)}
                 onReturnSale={(sale, selected) => void processReturn(sale, selected)}
+                onRetryStockConflict={retryStockConflict}
               />
             }
           />

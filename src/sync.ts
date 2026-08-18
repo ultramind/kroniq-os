@@ -35,8 +35,15 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
   if (!supabase || !navigator.onLine) return { synced: 0 }
   const events = await db.outbox.orderBy('createdAt').toArray()
   let synced = 0
+  let stockConflicts = 0
   for (const event of events) {
     if (!event.id) continue
+    // Conflicting sales are deliberately paused for a manager to resolve. They do
+    // not prevent later sales, deliveries, or shifts from syncing.
+    if (event.action === 'conflict') {
+      stockConflicts++
+      continue
+    }
     if (event.entity === 'shift_open' || event.entity === 'shift_close') {
       const payload = event.payload as Record<string, unknown>
       const { error } = await supabase.rpc(
@@ -155,7 +162,21 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
             }
           : null,
     })
-    if (saleError) return { synced, error: `Sale sync: ${saleError.message}` }
+    if (saleError) {
+      if (/insufficient stock/i.test(saleError.message)) {
+        await db.transaction('rw', db.sales, db.outbox, async () => {
+          await db.sales.update(sale.id, {
+            syncStatus: 'stock_conflict',
+            syncError:
+              'Stock changed while this device was offline. Restock or adjust inventory, then retry this sale.',
+          })
+          await db.outbox.update(event.id!, { action: 'conflict' })
+        })
+        stockConflicts++
+        continue
+      }
+      return { synced, error: `Sale sync: ${saleError.message}` }
+    }
     if (sale.paymentMethod === 'credit' && (sale.creditInitialPayment ?? 0) > 0) {
       const { error: creditError } = await supabase.rpc('record_credit_initial_payment', {
         p_sale_id: sale.id,
@@ -169,7 +190,12 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
     })
     synced++
   }
-  return { synced }
+  return {
+    synced,
+    error: stockConflicts
+      ? `${stockConflicts} sale${stockConflicts === 1 ? '' : 's'} need stock review.`
+      : undefined,
+  }
 }
 
 /** Keeps the checkout catalogue available locally after an online refresh. */
