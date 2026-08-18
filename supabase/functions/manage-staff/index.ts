@@ -32,29 +32,43 @@ Deno.serve(async (request) => {
       .eq('id', user.id)
       .single()
     if (!requester || requester.role !== 'admin') return json({ error: 'Administrator access required' }, 403)
+    const { data: requesterStore } = await adminClient
+      .from('stores')
+      .select('organization_id')
+      .eq('id', requester.store_id)
+      .single()
+    if (!requesterStore?.organization_id) return json({ error: 'Company workspace not found' }, 403)
+    const organizationId = requesterStore.organization_id
     const payload = await request.json()
     if (payload.action === 'list') {
-      const [{ data: profiles, error: profilesError }, { data: users, error: usersError }] =
+      const [{ data: memberships, error: membershipsError }, { data: users, error: usersError }] =
         await Promise.all([
           adminClient
-            .from('profiles')
-            .select('id, full_name, role, created_at')
-            .eq('store_id', requester.store_id)
+            .from('organization_memberships')
+            .select('user_id, role, status, created_at')
+            .eq('organization_id', organizationId)
             .order('created_at'),
           adminClient.auth.admin.listUsers({ page: 1, perPage: 100 }),
         ])
-      if (profilesError || usersError) throw profilesError ?? usersError
+      if (membershipsError || usersError) throw membershipsError ?? usersError
       const byId = new Map(users.users.map((member) => [member.id, member]))
+      const memberIds = (memberships ?? []).map((member) => member.user_id)
+      const { data: profiles, error: profilesError } = memberIds.length
+        ? await adminClient.from('profiles').select('id, full_name').in('id', memberIds)
+        : { data: [], error: null }
+      if (profilesError) throw profilesError
+      const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]))
       return json({
-        staff: (profiles ?? []).map((profile) => {
-          const user = byId.get(profile.id)
+        staff: (memberships ?? []).map((membership) => {
+          const user = byId.get(membership.user_id)
+          const profile = profileById.get(membership.user_id)
           return {
-            id: profile.id,
-            fullName: profile.full_name,
-            role: profile.role,
-            createdAt: profile.created_at,
+            id: membership.user_id,
+            fullName: profile?.full_name ?? user?.user_metadata?.full_name ?? 'Staff member',
+            role: membership.role,
+            createdAt: membership.created_at,
             email: user?.email ?? '',
-            active: !user?.banned_until,
+            active: membership.status === 'active',
           }
         }),
       })
@@ -75,6 +89,7 @@ Deno.serve(async (request) => {
         email_confirm: true,
       })
       let staffId = created.user?.id
+      const createdNewUser = Boolean(staffId)
       if (createError || !staffId) {
         const { data: users, error: usersError } = await adminClient.auth.admin.listUsers({
           page: 1,
@@ -85,34 +100,52 @@ Deno.serve(async (request) => {
         if (!existingUser) throw createError ?? new Error('User creation failed')
         const { data: existingProfile } = await adminClient
           .from('profiles')
-          .select('store_id')
+          .select('id')
           .eq('id', existingUser.id)
           .maybeSingle()
-        if (existingProfile)
+        const { data: existingMembership } = await adminClient
+          .from('organization_memberships')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('user_id', existingUser.id)
+          .maybeSingle()
+        if (existingMembership)
           return json(
             {
-              error:
-                existingProfile.store_id === requester.store_id
-                  ? 'This email already belongs to a staff account.'
-                  : 'This email belongs to another company.',
+              error: 'This email already belongs to this company.',
             },
             409,
           )
+        if (!existingProfile) return json({ error: 'This account is not ready for company access.' }, 409)
         const { error: restoreError } = await adminClient.auth.admin.updateUserById(existingUser.id, {
-          password,
           ban_duration: 'none',
-          email_confirm: true,
         })
         if (restoreError) throw restoreError
         staffId = existingUser.id
       }
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .insert({ id: staffId, store_id: requester.store_id, full_name: fullName.trim(), role })
-      if (profileError) {
-        if (created.user) await adminClient.auth.admin.deleteUser(staffId)
-        throw profileError
+      if (createdNewUser) {
+        const { error: profileError } = await adminClient
+          .from('profiles')
+          .insert({ id: staffId, store_id: requester.store_id, full_name: fullName.trim(), role })
+        if (profileError) {
+          if (created.user) await adminClient.auth.admin.deleteUser(staffId)
+          throw profileError
+        }
       }
+      const { error: membershipError } = await adminClient
+        .from('organization_memberships')
+        .upsert(
+          {
+            organization_id: organizationId,
+            user_id: staffId,
+            role,
+            status: 'active',
+            deactivated_at: null,
+            deactivated_by: null,
+          },
+          { onConflict: 'organization_id,user_id' },
+        )
+      if (membershipError) throw membershipError
       return json(
         {
           staff: {
@@ -131,15 +164,16 @@ Deno.serve(async (request) => {
       if (!payload.staffId || payload.staffId === user.id)
         return json({ error: 'You cannot deactivate this account.' }, 400)
       const { data: target } = await adminClient
-        .from('profiles')
+        .from('organization_memberships')
         .select('id')
-        .eq('id', payload.staffId)
-        .eq('store_id', requester.store_id)
+        .eq('organization_id', organizationId)
+        .eq('user_id', payload.staffId)
         .maybeSingle()
       if (!target) return json({ error: 'Staff member not found' }, 404)
-      const { error } = await adminClient.auth.admin.updateUserById(payload.staffId, {
-        ban_duration: '876000h',
-      })
+      const { error } = await adminClient
+        .from('organization_memberships')
+        .update({ status: 'deactivated', deactivated_at: new Date().toISOString(), deactivated_by: user.id })
+        .eq('id', target.id)
       if (error) throw error
       return json({ success: true })
     }

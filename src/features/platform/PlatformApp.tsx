@@ -148,6 +148,7 @@ type PageProps = {
   ) => Promise<void>
   onStoreStatusChange: (store: Store, status: 'active' | 'inactive') => Promise<void>
   onResendInvite: (organizationId: string, staffId: string) => Promise<void>
+  onDeleteOrganization: (organization: Organization, confirmation: string) => Promise<void>
 }
 
 function OrganizationList({
@@ -302,6 +303,7 @@ function OrganizationDetail({
   onProfileUpdate,
   onStoreStatusChange,
   onResendInvite,
+  onDeleteOrganization,
   plans,
   updatingId,
 }: PageProps) {
@@ -316,6 +318,8 @@ function OrganizationDetail({
   const [detailLoading, setDetailLoading] = useState(true)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [inviteStaffId, setInviteStaffId] = useState<string>()
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [form] = Form.useForm<{
     name: string
     businessEmail?: string
@@ -431,16 +435,21 @@ function OrganizationDetail({
             {organization.slug} · Joined {humanDate(organization.created_at)}
           </Typography.Text>
         </div>
-        <Select
-          value={organization.status}
-          loading={updatingId === organization.id}
-          onChange={(status) => void onStatusChange(organization, status)}
-          options={['trial', 'active', 'suspended', 'cancelled'].map((status) => ({
-            value: status,
-            label: `Set ${status}`,
-          }))}
-          className="min-w-36"
-        />
+        <div className="flex items-center gap-2">
+          <Select
+            value={organization.status}
+            loading={updatingId === organization.id}
+            onChange={(status) => void onStatusChange(organization, status)}
+            options={['trial', 'active', 'suspended', 'cancelled'].map((status) => ({
+              value: status,
+              label: `Set ${status}`,
+            }))}
+            className="min-w-36"
+          />
+          <Button danger onClick={() => setDeleteModalOpen(true)}>
+            Delete
+          </Button>
+        </div>
       </div>
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
@@ -628,6 +637,42 @@ function OrganizationDetail({
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        title="Delete organisation permanently"
+        open={deleteModalOpen}
+        okText="Delete organisation"
+        okButtonProps={{
+          danger: true,
+          disabled: deleteConfirmation !== organization.name,
+          loading: updatingId === organization.id,
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false)
+          setDeleteConfirmation('')
+        }}
+        onOk={() =>
+          void onDeleteOrganization(organization, deleteConfirmation).then(() => {
+            setDeleteModalOpen(false)
+            setDeleteConfirmation('')
+            navigate('/platform/organisations')
+          })
+        }
+      >
+        <Alert
+          type="warning"
+          showIcon
+          message="This removes all tenant business data, branches, staff access, sales, inventory, services, and storefront content."
+        />
+        <p className="mt-4 text-sm text-slate-600">
+          The users’ login accounts remain, so an owner can sign in and create a new company. Type{' '}
+          <strong>{organization.name}</strong> to confirm.
+        </p>
+        <Input
+          value={deleteConfirmation}
+          onChange={(event) => setDeleteConfirmation(event.target.value)}
+          placeholder={organization.name}
+        />
       </Modal>
     </>
   )
@@ -971,6 +1016,24 @@ export function PlatformApp() {
     },
     [api],
   )
+  const deleteOrganization = useCallback(
+    async (organization: Organization, confirmation: string) => {
+      if (!supabase) return
+      setUpdatingId(organization.id)
+      const { error } = await supabase.rpc('delete_platform_organization', {
+        p_organization_id: organization.id,
+        p_confirmation: confirmation,
+      })
+      setUpdatingId(undefined)
+      if (error) {
+        api.error(error.message)
+        return
+      }
+      api.success(`${organization.name} was deleted. Its owner can now create a new company.`)
+      await load()
+    },
+    [api, load],
+  )
   const pageProps: PageProps = {
     organizations,
     subscriptions,
@@ -981,6 +1044,7 @@ export function PlatformApp() {
     onProfileUpdate: updateProfile,
     onStoreStatusChange: updateStoreStatus,
     onResendInvite: resendInvite,
+    onDeleteOrganization: deleteOrganization,
     onStatusChange: updateStatus,
     updatingId,
     onRefresh: () => void load(),

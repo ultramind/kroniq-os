@@ -93,7 +93,7 @@ export function CompanyRegistration({ onBack, onSignedIn }: { onBack: () => void
             >
               Back to sign in
             </Button>
-            <Typography.Text className="text-xs font-bold uppercase tracking-[.18em] !text-zinc-500">
+            <Typography.Text className="!block text-xs font-bold uppercase tracking-[.18em] !text-zinc-500">
               Create company account
             </Typography.Text>
             <Typography.Title level={2} className="!mb-2 !mt-3 !text-3xl !tracking-tight">

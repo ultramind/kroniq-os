@@ -4,6 +4,7 @@ const storageKey = 'kroniq-offline-workspace'
 
 type OfflineWorkspace = {
   userId: string
+  organizationId?: string
   role: Role
   staffName?: string
   tenantName?: string
@@ -25,5 +26,11 @@ export function getOfflineWorkspace(userId: string): OfflineWorkspace | undefine
 }
 
 export function clearOfflineWorkspace() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) ?? '') as OfflineWorkspace
+    if (saved.userId) sessionStorage.removeItem(`kroniq-active-organization:${saved.userId}`)
+  } catch {
+    // Nothing to clear.
+  }
   localStorage.removeItem(storageKey)
 }

@@ -20,33 +20,33 @@ export function InventoryOverview({ products, role, onAdjustProduct, onCountProd
   const lowStock = needsAttention.length
   return (
     <Card className="overflow-hidden border-0 shadow-sm" bodyStyle={{ padding: 0 }}>
-      <div className="bg-gradient-to-r from-[#102417] to-[#1b5235] px-6 py-5 text-white">
+      <div className="bg-gradient-to-r from-[#0B1121] to-[#1d2d46] px-6 py-5 text-white">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-emerald-200">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-slate-300">
               Inventory control
             </p>
             <h2 className="mb-0 text-2xl font-semibold">Stock health</h2>
-            <p className="mb-0 mt-1 text-sm text-emerald-100/75">
+            <p className="mb-0 mt-1 text-sm text-slate-300/80">
               Monitor items that need a count or adjustment.
             </p>
           </div>
           <div className="rounded-xl bg-white/10 px-4 py-2 text-right">
-            <p className="mb-0 text-xs text-emerald-100">Active products</p>
+            <p className="mb-0 text-xs text-slate-300">Active products</p>
             <p className="mb-0 text-2xl font-semibold">{products.length}</p>
           </div>
         </div>
       </div>
       <div className="grid gap-5 p-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <div className={`rounded-xl p-5 ${lowStock ? 'bg-amber-50' : 'bg-emerald-50'}`}>
+        <div className={`rounded-xl p-5 ${lowStock ? 'bg-amber-50' : 'bg-slate-50'}`}>
           <div className="flex items-center gap-2">
-            <ExclamationCircleOutlined className={lowStock ? 'text-amber-600' : 'text-emerald-600'} />
+            <ExclamationCircleOutlined className={lowStock ? 'text-amber-600' : 'text-[#0B1121]'} />
             <Text strong>Attention needed</Text>
           </div>
           <Statistic
             className="mt-3"
             value={lowStock}
-            valueStyle={{ fontSize: 34, color: lowStock ? '#d46b08' : '#167843' }}
+            valueStyle={{ fontSize: 34, color: lowStock ? '#d46b08' : '#0B1121' }}
             suffix={<span className="text-sm font-normal text-slate-500">products</span>}
           />
           <Text type="secondary" className="mt-1 block text-xs">

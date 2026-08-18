@@ -83,7 +83,9 @@ export function Login({ onRegister, platform }: { onRegister?: () => void; platf
                 <LockOutlined /> Platform administrator
               </div>
             )}
-            <Text className="text-xs font-bold uppercase tracking-[.18em] !text-zinc-500">Welcome back</Text>
+            <Text className="!block text-xs font-bold uppercase tracking-[.18em] !text-zinc-500">
+              Welcome back
+            </Text>
             <Title level={2} className="!mb-2 !mt-3 !text-3xl !tracking-tight">
               Sign in to Kroniqos
             </Title>

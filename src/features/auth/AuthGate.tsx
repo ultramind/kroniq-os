@@ -13,6 +13,7 @@ import { PlatformAccessDenied, PlatformApp } from '../platform/PlatformApp'
 import { BillingPanel } from '../billing/BillingPanel'
 import { MarketingSite } from '../marketing/MarketingSite'
 import { StorefrontPage } from '../../pages/StorefrontPage'
+import { CompanyWorkspacePicker, type CompanyWorkspace } from './CompanyWorkspacePicker'
 import { useTheme } from '../../app/theme'
 import { pullProducts } from '../../sync'
 import { clearOfflineWorkspace, getOfflineWorkspace, saveOfflineWorkspace } from '../../lib/offlineWorkspace'
@@ -47,7 +48,34 @@ export function AuthGate() {
     staffName?: string
     tenantName?: string
     tenantLogoUrl?: string
+    workspaceChoices?: CompanyWorkspace[]
+    selectingWorkspaceId?: string
+    workspaceError?: string
   }>({ loading: true })
+  async function selectWorkspace(workspace: CompanyWorkspace) {
+    if (!supabase) return
+    setState((current) => ({
+      ...current,
+      selectingWorkspaceId: workspace.organizationId,
+      workspaceError: undefined,
+    }))
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase.rpc('activate_organization_workspace', {
+      p_organization_id: workspace.organizationId,
+    })
+    if (error) {
+      setState((current) => ({ ...current, selectingWorkspaceId: undefined, workspaceError: error.message }))
+      return
+    }
+    const cachedWorkspace = getOfflineWorkspace(user.id)
+    if (cachedWorkspace?.organizationId && cachedWorkspace.organizationId !== workspace.organizationId)
+      await clearLocalPosDataForNewTenant()
+    sessionStorage.setItem(`kroniq-active-organization:${user.id}`, workspace.organizationId)
+    window.location.reload()
+  }
   useEffect(() => {
     if (publicStorefrontRoute) {
       setState({ loading: false })
@@ -85,7 +113,15 @@ export function AuthGate() {
             tenantName: cachedWorkspace.tenantName,
             tenantLogoUrl: cachedWorkspace.tenantLogoUrl,
           }))
-        if (!platformRoute && !navigator.onLine) {
+        if (platformRoute) {
+          const { data: membership } = await within(
+            client.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle(),
+            'Platform access check',
+          )
+          setState({ loading: false, platformAdmin: Boolean(membership), platformDenied: !membership })
+          return
+        }
+        if (!navigator.onLine) {
           if (cachedWorkspace) {
             setState({
               loading: false,
@@ -102,13 +138,55 @@ export function AuthGate() {
           })
           return
         }
-        if (platformRoute) {
-          const { data: membership } = await within(
-            client.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle(),
-            'Platform access check',
-          )
-          setState({ loading: false, platformAdmin: Boolean(membership), platformDenied: !membership })
+        const { data: memberships, error: membershipsError } = await within(
+          client.rpc('current_user_memberships'),
+          'Company access check',
+        )
+        if (membershipsError) {
+          setState({ loading: false, startupError: membershipsError.message })
           return
+        }
+        const workspaces = (
+          (memberships ?? []) as Array<{
+            organization_id: string
+            organization_name: string
+            role: Role
+            status: string
+          }>
+        )
+          .filter((membership) => membership.status === 'active')
+          .map((membership) => ({
+            organizationId: membership.organization_id,
+            organizationName: membership.organization_name,
+            role: membership.role,
+          }))
+        if (!workspaces.length) {
+          setState({ loading: false, onboarding: true })
+          return
+        }
+        const workspaceKey = `kroniq-active-organization:${session.user.id}`
+        let activeWorkspace = workspaces.find(
+          (workspace) => workspace.organizationId === sessionStorage.getItem(workspaceKey),
+        )
+        if (!activeWorkspace && workspaces.length > 1) {
+          setState({ loading: false, workspaceChoices: workspaces })
+          return
+        }
+        activeWorkspace ??= workspaces[0]
+        if (
+          cachedWorkspace?.organizationId &&
+          cachedWorkspace.organizationId !== activeWorkspace.organizationId
+        )
+          await clearLocalPosDataForNewTenant()
+        if (sessionStorage.getItem(workspaceKey) !== activeWorkspace.organizationId) {
+          const { error: activationError } = await client.rpc('activate_organization_workspace', {
+            p_organization_id: activeWorkspace.organizationId,
+          })
+          if (activationError) {
+            setState({ loading: false, startupError: activationError.message })
+            return
+          }
+          sessionStorage.setItem(workspaceKey, activeWorkspace.organizationId)
         }
         const { data, error } = await within(
           client.from('profiles').select('role, full_name, store_id').eq('id', session.user.id).maybeSingle(),
@@ -154,6 +232,7 @@ export function AuthGate() {
         }
         saveOfflineWorkspace({
           userId: session.user.id,
+          organizationId: activeWorkspace.organizationId,
           role: data.role,
           staffName: data.full_name,
           tenantName,
@@ -203,6 +282,15 @@ export function AuthGate() {
     return () => listener.subscription.unsubscribe()
   }, [navigate, platformRoute, publicStorefrontRoute])
   if (publicStorefrontRoute) return <StorefrontPage />
+  if (state.workspaceChoices)
+    return (
+      <CompanyWorkspacePicker
+        companies={state.workspaceChoices}
+        selectingId={state.selectingWorkspaceId}
+        onSelect={(workspace) => void selectWorkspace(workspace)}
+        onSignOut={() => void supabase?.auth.signOut()}
+      />
+    )
   if (state.loading)
     return (
       <main

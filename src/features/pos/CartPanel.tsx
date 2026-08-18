@@ -91,10 +91,10 @@ export function CartPanel({
   const [creditError, setCreditError] = useState('')
   const [creditors, setCreditors] = useState<Creditor[]>([])
   const [loadingCreditors, setLoadingCreditors] = useState(false)
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10))
+  const [saleDate, setSaleDate] = useState(() => dayjs().format('YYYY-MM-DD'))
   const [deductStock, setDeductStock] = useState(false)
-  const today = new Date().toISOString().slice(0, 10)
-  const isHistorical = saleDate < today
+  const today = dayjs().format('YYYY-MM-DD')
+  const isHistorical = dayjs(saleDate).isBefore(dayjs(), 'day')
   const canRecordHistorical = role === 'admin' || role === 'manager'
   const change = cashReceived === null ? null : Math.max(0, cashReceived - total)
   const cashIsInsufficient = paymentMethod === 'cash' && (cashReceived === null || cashReceived < total)
@@ -311,10 +311,10 @@ export function CartPanel({
             allowClear={false}
             className="w-full"
             disabledDate={(date) => date.isAfter(dayjs(), 'day')}
-            onChange={(_, value) => {
-              const selectedDate = value || today
+            onChange={(selectedDay) => {
+              const selectedDate = selectedDay?.format('YYYY-MM-DD') ?? today
               setSaleDate(selectedDate)
-              if (selectedDate >= today) setDeductStock(false)
+              if (!selectedDay || !selectedDay.isBefore(dayjs(), 'day')) setDeductStock(false)
             }}
           />
           {isHistorical && (
