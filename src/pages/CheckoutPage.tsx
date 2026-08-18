@@ -62,6 +62,8 @@ export function CheckoutPage({
   const [quantityProduct, setQuantityProduct] = useState<Product>()
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [cartDrawerWidth, setCartDrawerWidth] = useState('min(100vw, 430px)')
+  const [cartReceiving, setCartReceiving] = useState(false)
   const searchInputRef = useRef<InputRef>(null)
   const heldSales = useLiveQuery(() => db.heldSales.toArray(), []) ?? []
   const hold =
@@ -82,6 +84,27 @@ export function CheckoutPage({
   useEffect(() => {
     if (searchParams.has('cart')) setCartDrawerOpen(true)
   }, [searchParams])
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px) and (max-width: 1023px)')
+    const updateWidth = () => setCartDrawerWidth(media.matches ? '75vw' : 'min(100vw, 430px)')
+    updateWidth()
+    media.addEventListener('change', updateWidth)
+    return () => media.removeEventListener('change', updateWidth)
+  }, [])
+  useEffect(() => {
+    let timer: number | undefined
+    const animateCart = () => {
+      setCartReceiving(false)
+      window.requestAnimationFrame(() => setCartReceiving(true))
+      if (timer) window.clearTimeout(timer)
+      timer = window.setTimeout(() => setCartReceiving(false), 520)
+    }
+    window.addEventListener('kroniq-cart-added', animateCart)
+    return () => {
+      window.removeEventListener('kroniq-cart-added', animateCart)
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [])
   const openCustomerDisplay = () => {
     const display = window.open(
       new URL('/customer-display', window.location.origin).toString(),
@@ -93,9 +116,23 @@ export function CheckoutPage({
   const quantityAlreadyInCart = quantityProduct
     ? (cart.find((item) => item.id === quantityProduct.id)?.quantity ?? 0)
     : 0
+  const findExactBarcodeProduct = (code: string) => {
+    const normalized = code.trim()
+    return products.find((product) => product.sku.trim() === normalized)
+  }
   const openScannedProduct = (code: string) => {
-    const product = onBarcodeLookup(code)
-    if (product) setQuantityProduct(product)
+    const normalized = code.trim()
+    if (!normalized) return
+    const product = findExactBarcodeProduct(normalized) ?? onBarcodeLookup(normalized)
+    if (product) {
+      onSearchChange(normalized)
+      setQuantityProduct(product)
+    }
+  }
+  const handleSearchChange = (value: string) => {
+    onSearchChange(value)
+    const product = findExactBarcodeProduct(value)
+    if (product && product.stock > 0) setQuantityProduct(product)
   }
   const columns: TableColumnsType<Product> = [
     {
@@ -174,7 +211,11 @@ export function CheckoutPage({
     <>
       <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_410px]">
         <div className="fixed right-0 top-16 z-30 lg:hidden">
-          <Badge count={cartItemCount} size="small" className="cart-drawer-trigger">
+          <Badge
+            count={cartItemCount}
+            size="small"
+            className={`cart-drawer-trigger ${cartReceiving ? 'is-receiving' : ''}`}
+          >
             <Button
               type="primary"
               aria-label="Open current sale"
@@ -195,7 +236,7 @@ export function CheckoutPage({
                 autoFocus
                 size="large"
                 value={search}
-                onChange={(event) => onSearchChange(event.target.value)}
+                onChange={(event) => handleSearchChange(event.target.value)}
                 onPressEnter={() => openScannedProduct(search)}
                 placeholder="Search name, SKU, or scan barcode"
                 allowClear
@@ -287,8 +328,8 @@ export function CheckoutPage({
           setCartDrawerOpen(false)
           navigate('/checkout', { replace: true })
         }}
-        width="min(100vw, 430px)"
-        className="lg:hidden"
+        width={cartDrawerWidth}
+        className="checkout-cart-drawer lg:hidden"
         bodyStyle={{ padding: 16 }}
       >
         {cartPanel}
@@ -328,10 +369,7 @@ export function CheckoutPage({
       <CameraBarcodeScannerModal
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
-        onScan={(barcode) => {
-          onSearchChange(barcode)
-          openScannedProduct(barcode)
-        }}
+        onScan={openScannedProduct}
       />
     </>
   )

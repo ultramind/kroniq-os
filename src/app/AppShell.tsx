@@ -51,6 +51,21 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const [businessModes, setBusinessModes] = useState<string[]>(['retail'])
   const [userName, setUserName] = useState('Account')
   const [tenantBrand, setTenantBrand] = useState({ name: 'Kroniqos', logoUrl: '' })
+  const [cartReceiving, setCartReceiving] = useState(false)
+  useEffect(() => {
+    let timer: number | undefined
+    const animateCart = () => {
+      setCartReceiving(false)
+      window.requestAnimationFrame(() => setCartReceiving(true))
+      if (timer) window.clearTimeout(timer)
+      timer = window.setTimeout(() => setCartReceiving(false), 520)
+    }
+    window.addEventListener('kroniq-cart-added', animateCart)
+    return () => {
+      window.removeEventListener('kroniq-cart-added', animateCart)
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [])
   useEffect(() => {
     if (!supabase) return
     void (async () => {
@@ -404,6 +419,23 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
           Copyright © {new Date().getFullYear()} · Powered by AltraMorph Technologies
         </Footer>
       </Layout>
+      {retailEnabled && pathname !== '/checkout' && (
+        <div className="fixed right-0 top-16 z-30 lg:hidden">
+          <Badge
+            count={cartItemCount}
+            size="small"
+            className={`cart-drawer-trigger ${cartReceiving ? 'is-receiving' : ''}`}
+          >
+            <Button
+              type="primary"
+              aria-label="Open current sale"
+              className="!h-[46px] !w-[46px] !rounded-l !rounded-r-none !p-0"
+              icon={<ShoppingCartOutlined />}
+              onClick={() => navigate('/checkout?cart=1')}
+            />
+          </Badge>
+        </div>
+      )}
       <nav className="mobile-bottom-nav md:hidden" aria-label="Mobile navigation">
         {mobileItems.map((item) => {
           const selected =

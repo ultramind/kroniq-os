@@ -15,6 +15,7 @@ import { MarketingSite } from '../marketing/MarketingSite'
 import { StorefrontPage } from '../../pages/StorefrontPage'
 import { useTheme } from '../../app/theme'
 import { pullProducts } from '../../sync'
+import { clearOfflineWorkspace, getOfflineWorkspace, saveOfflineWorkspace } from '../../lib/offlineWorkspace'
 
 export function AuthGate() {
   const { mode } = useTheme()
@@ -71,7 +72,24 @@ export function AuthGate() {
           data: { session },
         } = await within(client.auth.getSession(), 'Session check')
         if (!session) {
+          clearOfflineWorkspace()
           setState({ loading: false, unauthenticated: true })
+          return
+        }
+        const cachedWorkspace = getOfflineWorkspace(session.user.id)
+        if (!platformRoute && !navigator.onLine) {
+          if (cachedWorkspace) {
+            setState({
+              loading: false,
+              role: cachedWorkspace.role,
+              staffName: cachedWorkspace.staffName,
+            })
+            return
+          }
+          setState({
+            loading: false,
+            startupError: 'This device must sign in online once before it can open the offline checkout.',
+          })
           return
         }
         if (platformRoute) {
@@ -95,6 +113,7 @@ export function AuthGate() {
           setState({ loading: false, onboarding: true })
           return
         }
+        saveOfflineWorkspace({ userId: session.user.id, role: data.role, staffName: data.full_name })
         const { data: billing } = (await within(
           client.rpc('current_organization_billing_status').maybeSingle(),
           'Subscription check',
@@ -107,6 +126,18 @@ export function AuthGate() {
         if (redirectToDefault) navigate(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
         setState({ loading: false, role: data.role, staffName: data.full_name })
       } catch (error) {
+        const {
+          data: { session },
+        } = await client.auth.getSession()
+        const cachedWorkspace = session ? getOfflineWorkspace(session.user.id) : undefined
+        if (!platformRoute && cachedWorkspace) {
+          setState({
+            loading: false,
+            role: cachedWorkspace.role,
+            staffName: cachedWorkspace.staffName,
+          })
+          return
+        }
         setState({
           loading: false,
           startupError: error instanceof Error ? error.message : 'Could not start the tenant workspace.',

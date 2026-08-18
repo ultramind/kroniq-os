@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { App as AntApp, message } from 'antd'
-import { db, seedDatabase } from '../db'
+import { db } from '../db'
 import { pullDeliveries, pullProducts, pullSales } from '../sync'
 import { useBackgroundSync } from '../hooks/useBackgroundSync'
 import { supabase } from '../supabase'
@@ -77,14 +77,10 @@ export function App({
   const [receipt, setReceipt] = useState<{ sale: Sale; items: ReceiptItem[] }>()
   useEffect(() => {
     const loadCatalogue = async () => {
-      if (!supabase || !navigator.onLine) {
-        await seedDatabase()
-        return
-      }
+      if (!supabase || !navigator.onLine) return
       const result = await pullProducts()
       if (result.error) {
         setSyncError(`Catalogue load: ${result.error}`)
-        await seedDatabase()
       }
     }
     void loadCatalogue()
@@ -175,14 +171,24 @@ export function App({
   }
   async function checkout(credit?: CreditDetails) {
     if (!state.cart.length) return
-    const cart = [...state.cart]
-    const sale = await saveOfflineSale(cart, total, state.paymentMethod, discount, credit)
-    state.clearCart()
-    setReceipt({
-      sale,
-      items: cart.map((item) => ({ productName: item.name, quantity: item.quantity, unitPrice: item.price })),
-    })
-    api.success(`Sale ${sale.receiptNo} saved locally and queued for sync.`)
+    try {
+      const cart = [...state.cart]
+      const sale = await saveOfflineSale(cart, total, state.paymentMethod, discount, credit)
+      state.clearCart()
+      setReceipt({
+        sale,
+        items: cart.map((item) => ({
+          productName: item.name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+        })),
+      })
+      api.success(`Sale ${sale.receiptNo} saved locally and queued for sync.`)
+    } catch (error) {
+      api.error(
+        error instanceof Error ? error.message : 'Could not save this sale on the device. Please try again.',
+      )
+    }
   }
   async function recordHistoricalSale(
     credit: CreditDetails | undefined,

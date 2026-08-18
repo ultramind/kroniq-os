@@ -8,6 +8,7 @@ type Props = { open: boolean; onClose: () => void; onScan: (barcode: string) => 
 export function CameraBarcodeScannerModal({ open, onClose, onScan }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [error, setError] = useState('')
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     if (!open) return
@@ -15,17 +16,31 @@ export function CameraBarcodeScannerModal({ open, onClose, onScan }: Props) {
     let controls: IScannerControls | undefined
     let cancelled = false
     let scanned = false
+    let startTimer: number | undefined
 
-    void (async () => {
+    const startCamera = async () => {
       try {
+        if (!window.isSecureContext) {
+          setError('Camera scanning needs HTTPS. Use the secure deployed app or localhost for local testing.')
+          return
+        }
         if (!navigator.mediaDevices?.getUserMedia) {
           setError('Camera access is not available in this browser. Enter the barcode manually instead.')
           return
         }
+        const video = videoRef.current
+        if (!video) throw new Error('Camera preview is not ready yet.')
         const reader = new BrowserMultiFormatReader()
         controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } }, audio: false },
-          videoRef.current ?? undefined,
+          {
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          },
+          video,
           (result) => {
             if (!result || scanned || cancelled) return
             scanned = true
@@ -44,25 +59,41 @@ export function CameraBarcodeScannerModal({ open, onClose, onScan }: Props) {
           )
         }
       }
-    })()
+    }
+
+    // Defer one frame so the Ant Design modal has mounted its video element.
+    // It also prevents React Strict Mode from opening two camera streams in development.
+    startTimer = window.setTimeout(() => void startCamera(), 0)
 
     return () => {
       cancelled = true
+      if (startTimer !== undefined) window.clearTimeout(startTimer)
       controls?.stop()
     }
-  }, [onClose, onScan, open])
+  }, [onClose, onScan, open, retryKey])
 
   return (
     <Modal
       title="Scan barcode"
       open={open}
-      footer={<Button onClick={onClose}>Cancel</Button>}
+      footer={
+        <Space>
+          {error && <Button onClick={() => setRetryKey((key) => key + 1)}>Try again</Button>}
+          <Button onClick={onClose}>Cancel</Button>
+        </Space>
+      }
       onCancel={onClose}
       destroyOnClose
     >
       <div className="space-y-3">
         <div className="overflow-hidden bg-black">
-          <video ref={videoRef} className="block aspect-video w-full object-cover" muted playsInline />
+          <video
+            ref={videoRef}
+            className="block aspect-video w-full object-cover"
+            autoPlay
+            muted
+            playsInline
+          />
         </div>
         <Space>
           <ScanOutlined />

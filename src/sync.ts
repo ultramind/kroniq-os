@@ -234,6 +234,11 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
       featured: row.is_featured ?? false,
     }
   })
+  const cachedCount = await db.products.count()
+  // Retain an already-downloaded checkout catalogue if a PWA wake-up receives an
+  // empty response while authentication or the connection is still settling.
+  if (products.length === 0 && cachedCount > 0) return { loaded: cachedCount }
+
   await db.transaction('rw', db.products, async () => {
     await db.products.clear()
     await db.products.bulkPut(products)
