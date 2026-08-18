@@ -57,6 +57,7 @@ type Props = {
     deductStock: boolean,
   ) => void
   historicalSaving?: boolean
+  checkoutSaving?: boolean
   onHold: () => void
   onOpenCustomerDisplay: () => void
   children?: React.ReactNode
@@ -75,6 +76,7 @@ export function CartPanel({
   onCheckout,
   onHistoricalCheckout,
   historicalSaving = false,
+  checkoutSaving = false,
   onHold,
   onOpenCustomerDisplay,
   children,
@@ -450,12 +452,13 @@ export function CartPanel({
         type="primary"
         size="large"
         block
-        loading={historicalSaving}
+        loading={historicalSaving || checkoutSaving}
         className="touch-checkout touch-target whitespace-normal px-2 text-base font-bold leading-tight active:scale-[0.98]"
         disabled={
           !cart.length ||
           cashIsInsufficient ||
           creditDetailsMissing ||
+          checkoutSaving ||
           (isHistorical && !onHistoricalCheckout)
         }
         onClick={() => {

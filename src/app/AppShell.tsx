@@ -21,6 +21,7 @@ import {
   TruckOutlined,
   UserOutlined,
   WalletOutlined,
+  WifiOutlined,
 } from '@ant-design/icons'
 import { Avatar, Badge, Button, Dropdown, Layout, Menu, Tag, Tooltip, Typography } from 'antd'
 import { useEffect, useState } from 'react'
@@ -52,6 +53,16 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const [userName, setUserName] = useState('Account')
   const [tenantBrand, setTenantBrand] = useState({ name: 'Kroniqos', logoUrl: '' })
   const [cartReceiving, setCartReceiving] = useState(false)
+  const [online, setOnline] = useState(() => navigator.onLine)
+  useEffect(() => {
+    const setOnlineStatus = () => setOnline(navigator.onLine)
+    window.addEventListener('online', setOnlineStatus)
+    window.addEventListener('offline', setOnlineStatus)
+    return () => {
+      window.removeEventListener('online', setOnlineStatus)
+      window.removeEventListener('offline', setOnlineStatus)
+    }
+  }, [])
   useEffect(() => {
     let timer: number | undefined
     const animateCart = () => {
@@ -328,7 +339,15 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
         >
           <div className="mx-auto flex min-h-[44px] max-w-7xl flex-nowrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="mb-0 truncate text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="mb-0 truncate text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
+                <Tooltip title={online ? 'Device is online' : 'Device is offline'}>
+                  <WifiOutlined
+                    aria-label={online ? 'Device is online' : 'Device is offline'}
+                    className={online ? 'shrink-0 text-emerald-500' : 'shrink-0 text-red-500'}
+                  />
+                </Tooltip>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Tag

@@ -109,6 +109,16 @@ export function AuthGate() {
           return
         }
         if (!data) {
+          // Keep a previously verified device workspace during a flaky refresh.
+          // Clearing IndexedDB here would make an offline cashier lose the catalogue.
+          if (cachedWorkspace) {
+            setState({
+              loading: false,
+              role: cachedWorkspace.role,
+              staffName: cachedWorkspace.staffName,
+            })
+            return
+          }
           await clearLocalPosDataForNewTenant()
           setState({ loading: false, onboarding: true })
           return

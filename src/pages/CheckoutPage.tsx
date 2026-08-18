@@ -1,4 +1,4 @@
-import { CameraOutlined, SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
+import { CameraOutlined, ClearOutlined, SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { Badge, Button, Card, Drawer, Input, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { InputRef } from 'antd'
@@ -33,6 +33,7 @@ type Props = {
   onCheckout: (credit?: CreditDetails) => void
   onHistoricalCheckout?: (credit: CreditDetails | undefined, saleDate: string, deductStock: boolean) => void
   historicalSaving?: boolean
+  checkoutSaving?: boolean
   onHold?: () => void
 }
 
@@ -54,6 +55,7 @@ export function CheckoutPage({
   onCheckout,
   onHistoricalCheckout,
   historicalSaving,
+  checkoutSaving,
   onHold,
 }: Props) {
   const state = usePosStore()
@@ -193,6 +195,7 @@ export function CheckoutPage({
       onCheckout={onCheckout}
       onHistoricalCheckout={onHistoricalCheckout}
       historicalSaving={historicalSaving}
+      checkoutSaving={checkoutSaving}
       onHold={hold}
       onOpenCustomerDisplay={openCustomerDisplay}
     >
@@ -243,6 +246,18 @@ export function CheckoutPage({
                 className="checkout-product-search w-full sm:flex-1"
               />
               <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button
+                  danger
+                  size="large"
+                  className="!hidden !h-auto sm:!inline-flex"
+                  icon={<ClearOutlined />}
+                  onClick={() => {
+                    onSearchChange('')
+                    searchInputRef.current?.focus()
+                  }}
+                >
+                  Clear
+                </Button>
                 <Button
                   size="large"
                   className="!h-auto"

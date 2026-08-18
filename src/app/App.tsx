@@ -70,6 +70,7 @@ export function App({
   const [countingProduct, setCountingProduct] = useState<Product>()
   const [savingCount, setSavingCount] = useState(false)
   const [savingHistoricalSale, setSavingHistoricalSale] = useState(false)
+  const [savingCheckout, setSavingCheckout] = useState(false)
   const [syncError, setSyncError] = useState<string>()
   const [flexiblePricingEnabled, setFlexiblePricingEnabled] = useState(
     () => getStoreSettings().flexiblePricingEnabled,
@@ -170,7 +171,8 @@ export function App({
     return product
   }
   async function checkout(credit?: CreditDetails) {
-    if (!state.cart.length) return
+    if (!state.cart.length || savingCheckout) return
+    setSavingCheckout(true)
     try {
       const cart = [...state.cart]
       const sale = await saveOfflineSale(cart, total, state.paymentMethod, discount, credit)
@@ -188,6 +190,8 @@ export function App({
       api.error(
         error instanceof Error ? error.message : 'Could not save this sale on the device. Please try again.',
       )
+    } finally {
+      setSavingCheckout(false)
     }
   }
   async function recordHistoricalSale(
@@ -546,6 +550,7 @@ export function App({
                   void recordHistoricalSale(credit, saleDate, deductStock)
                 }
                 historicalSaving={savingHistoricalSale}
+                checkoutSaving={savingCheckout}
               />
             }
           />
