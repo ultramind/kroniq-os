@@ -36,7 +36,7 @@ type Project = {
 }
 const projectStatus = (project: Project) =>
   project.status === 'completed'
-    ? { label: 'Completed', color: 'green' }
+    ? { label: 'Completed', color: 'success' }
     : project.status === 'cancelled'
       ? { label: 'Cancelled', color: 'default' }
       : project.due_at && dayjs(project.due_at).endOf('day').isBefore(dayjs())
@@ -96,7 +96,7 @@ export function ServiceJobs() {
           b.error?.message ??
           c.error?.message ??
           d.error?.message ??
-          'Could not load projects.',
+          'Could not load contracts.',
       )
     else {
       setProjects((a.data ?? []) as Project[])
@@ -174,7 +174,7 @@ export function ServiceJobs() {
         .select('id')
         .single()
       if (error || !project) {
-        api.error(error?.message ?? 'Could not create project.')
+        api.error(error?.message ?? 'Could not create contract.')
         return
       }
       if (values.stageId)
@@ -182,7 +182,7 @@ export function ServiceJobs() {
           service_job_id: project.id,
           stage_id: values.stageId,
           changed_by: user?.id,
-          note: 'Project created',
+          note: 'Contract created',
         })
       if (values.deposit > 0)
         await supabase.from('project_payments').insert({
@@ -198,7 +198,7 @@ export function ServiceJobs() {
           .from('project-documents')
           .upload(storagePath, pendingDocument, { contentType: 'application/pdf' })
         if (uploadError)
-          api.warning(`Project created, but the document was not uploaded: ${uploadError.message}`)
+          api.warning(`Contract created, but the document was not uploaded: ${uploadError.message}`)
         else {
           const { error: documentError } = await supabase.from('project_documents').insert({
             service_job_id: project.id,
@@ -210,10 +210,10 @@ export function ServiceJobs() {
             uploaded_by: user?.id,
           })
           if (documentError)
-            api.warning(`Project created, but the document record was not saved: ${documentError.message}`)
+            api.warning(`Contract created, but the document record was not saved: ${documentError.message}`)
         }
       }
-      api.success('Project created.')
+      api.success('Contract created.')
       setOpen(false)
       setStep(0)
       setPendingDocument(undefined)
@@ -246,7 +246,7 @@ export function ServiceJobs() {
               setOpen(true)
             }}
           >
-            New project
+            New contract
           </Button>
         }
       >
@@ -254,7 +254,7 @@ export function ServiceJobs() {
           rowKey="id"
           dataSource={projects}
           columns={[
-            { title: 'Project', dataIndex: 'title' },
+            { title: 'Contract', dataIndex: 'title' },
             { title: 'Client', render: (_, p: Project) => clientName(p.customer) ?? '—' },
             { title: 'Value', dataIndex: 'quoted_amount_kobo', render: (v: number) => formatNaira(v / 100) },
             {
@@ -289,17 +289,18 @@ export function ServiceJobs() {
         />
       </Card>
       <Modal
-        title="New project"
+        title="New contract"
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => (step === 0 ? continueToProject() : void form.submit())}
         confirmLoading={saving}
-        okText={step === 0 ? 'Continue' : 'Create project'}
+        okText={step === 0 ? 'Continue' : 'Create contract'}
         width={720}
+        className="wide-modal"
       >
         <Steps
           current={step}
-          items={[{ title: 'Client details' }, { title: 'Project details' }]}
+          items={[{ title: 'Client details' }, { title: 'Contract details' }]}
           className="mb-6"
         />
         <Form form={form} layout="vertical" onFinish={(values) => create({ ...clientDraft, ...values })}>
@@ -360,14 +361,14 @@ export function ServiceJobs() {
                   <Select options={stages.map((x) => ({ value: x.id, label: x.name }))} />
                 </Form.Item>
               </div>
-              <Form.Item name="title" label="Project / contract title" rules={[{ required: true }]}>
+              <Form.Item name="title" label="Contract title" rules={[{ required: true }]}>
                 <Input autoFocus />
               </Form.Item>
-              <Form.Item name="description" label="Project details">
+              <Form.Item name="description" label="Contract details">
                 <Input.TextArea rows={3} />
               </Form.Item>
               <div className="grid grid-cols-2 gap-3">
-                <Form.Item name="projectDate" label="Project date" rules={[{ required: true }]}>
+                <Form.Item name="projectDate" label="Contract date" rules={[{ required: true }]}>
                   <DatePicker className="w-full" />
                 </Form.Item>
                 <Form.Item name="dueAt" label="Estimated delivery">
@@ -382,14 +383,14 @@ export function ServiceJobs() {
                   <CurrencyInput min={0} className="w-full" />
                 </Form.Item>
               </div>
-              <Form.Item label="Project document (PDF)">
+              <Form.Item label="Contract document (PDF)">
                 <Upload
                   accept="application/pdf,.pdf"
                   maxCount={1}
                   showUploadList={false}
                   beforeUpload={(file) => {
                     if (file.size > 10 * 1024 * 1024) {
-                      api.error('Project document must be 10 MB or smaller.')
+                      api.error('Contract document must be 10 MB or smaller.')
                       return Upload.LIST_IGNORE
                     }
                     setPendingDocument(file as File)

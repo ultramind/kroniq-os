@@ -46,10 +46,11 @@ export function PartialReturnModal({ sale, open, saving, onClose, onSubmit }: Pr
       onCancel={onClose}
       onOk={() => sale && onSubmit(sale, selected)}
       width={720}
+      className="wide-modal"
     >
       <Alert
         className="mb-4"
-        type="info"
+        type="warning"
         showIcon
         message="Select only the quantities received back. Stock is restored immediately and the return is queued for sync."
       />

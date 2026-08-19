@@ -30,6 +30,7 @@ import { ShiftsPage } from '../pages/ShiftsPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { ReportsPage } from '../pages/ReportsPage'
 import { CreditsPage } from '../pages/CreditsPage'
+import { OrdersPage } from '../pages/OrdersPage'
 import { ProductsPage } from '../pages/ProductsPage'
 import { DeliveriesPage } from '../pages/DeliveriesPage'
 import { ExpensesPage } from '../pages/ExpensesPage'
@@ -75,6 +76,7 @@ export function App({
   const [flexiblePricingEnabled, setFlexiblePricingEnabled] = useState(
     () => getStoreSettings().flexiblePricingEnabled,
   )
+  const [orderCheckoutOnly, setOrderCheckoutOnly] = useState(false)
   const [receipt, setReceipt] = useState<{ sale: Sale; items: ReceiptItem[] }>()
   useEffect(() => {
     const loadCatalogue = async () => {
@@ -98,7 +100,7 @@ export function App({
       if (!profile) return
       const { data: store } = await supabase
         .from('stores')
-        .select('currency_code,flexible_pricing_enabled')
+        .select('currency_code,flexible_pricing_enabled,organization_id')
         .eq('id', profile.store_id)
         .maybeSingle()
       if (store?.currency_code)
@@ -109,6 +111,17 @@ export function App({
         })
       if (store?.flexible_pricing_enabled !== undefined)
         setFlexiblePricingEnabled(store.flexible_pricing_enabled)
+      if (store?.organization_id) {
+        const { data: organization } = await supabase
+          .from('organizations')
+          .select('business_modes')
+          .eq('id', store.organization_id)
+          .maybeSingle()
+        const modes = organization?.business_modes ?? []
+        const orderOnly = modes.includes('services') && !modes.includes('retail')
+        setOrderCheckoutOnly(orderOnly)
+        if (orderOnly) state.setPaymentMethod('order')
+      }
     })()
   }, [])
   useEffect(() => {
@@ -232,32 +245,58 @@ export function App({
     const receiptNo = `HIS-${Date.now().toString().slice(-8)}`
     setSavingHistoricalSale(true)
     try {
-      const { error } = await supabase.rpc(
-        deductStock ? 'record_historical_sale_with_stock' : 'record_historical_sale',
-        {
+      if (state.paymentMethod === 'order') {
+        if (!credit?.customerName?.trim() || !credit.customerPhone?.trim())
+          throw new Error('Client name and phone number are required for an order.')
+        const { error } = await supabase.rpc('record_order', {
           p_sale_id: id,
           p_receipt_no: receiptNo,
           p_total_kobo: Math.round(total * 100),
-          p_payment_method: state.paymentMethod,
+          p_payment_method: 'order',
           p_sold_at: createdAt,
           p_discount_kobo: Math.round(discount * 100),
           p_items: cart.map((item) => ({
-            product_id: item.id,
+            product_id: item.sourceProductId ?? item.id,
+            packaging_id: item.packagingId ?? null,
             quantity: item.quantity,
             unit_price_kobo: Math.round(item.price * 100),
           })),
-          p_credit:
-            state.paymentMethod === 'credit'
-              ? {
-                  customer_name: credit?.customerName,
-                  customer_phone: credit?.customerPhone,
-                  due_date: credit?.dueDate,
-                  initial_payment_kobo: Math.round((credit?.initialPayment ?? 0) * 100),
-                }
-              : null,
-        },
-      )
-      if (error) throw error
+          p_credit: {
+            customer_name: credit.customerName.trim(),
+            customer_phone: credit.customerPhone.trim(),
+            due_date: credit.dueDate,
+            initial_payment_kobo: Math.round((credit.initialPayment ?? 0) * 100),
+          },
+        })
+        if (error) throw error
+      } else {
+        const { error } = await supabase.rpc(
+          deductStock ? 'record_historical_sale_with_stock' : 'record_historical_sale',
+          {
+            p_sale_id: id,
+            p_receipt_no: receiptNo,
+            p_total_kobo: Math.round(total * 100),
+            p_payment_method: state.paymentMethod,
+            p_sold_at: createdAt,
+            p_discount_kobo: Math.round(discount * 100),
+            p_items: cart.map((item) => ({
+              product_id: item.id,
+              quantity: item.quantity,
+              unit_price_kobo: Math.round(item.price * 100),
+            })),
+            p_credit:
+              state.paymentMethod === 'credit'
+                ? {
+                    customer_name: credit?.customerName,
+                    customer_phone: credit?.customerPhone,
+                    due_date: credit?.dueDate,
+                    initial_payment_kobo: Math.round((credit?.initialPayment ?? 0) * 100),
+                  }
+                : null,
+          },
+        )
+        if (error) throw error
+      }
       const sale: Sale = {
         id,
         receiptNo,
@@ -273,6 +312,7 @@ export function App({
         creditCustomerPhone: credit?.customerPhone,
         creditDueDate: credit?.dueDate,
         creditInitialPayment: credit?.initialPayment ?? 0,
+        orderStatus: state.paymentMethod === 'order' ? 'pending' : undefined,
       }
       await db.transaction('rw', db.sales, db.saleItems, async () => {
         await db.sales.put(sale)
@@ -297,11 +337,16 @@ export function App({
           unitPrice: item.price,
         })),
       })
-      void Promise.all([pullSales(), ...(deductStock ? [pullProducts()] : [])])
+      void Promise.all([
+        pullSales(),
+        ...(deductStock && state.paymentMethod !== 'order' ? [pullProducts()] : []),
+      ])
       api.success(
-        deductStock
-          ? `Historical sale ${receiptNo} recorded and current stock was corrected.`
-          : `Historical sale ${receiptNo} recorded without changing stock.`,
+        state.paymentMethod === 'order'
+          ? `Backdated order ${receiptNo} recorded without changing stock.`
+          : deductStock
+            ? `Historical sale ${receiptNo} recorded and current stock was corrected.`
+            : `Historical sale ${receiptNo} recorded without changing stock.`,
       )
     } catch (error) {
       const details = error && typeof error === 'object' && 'message' in error ? String(error.message) : ''
@@ -536,8 +581,8 @@ export function App({
       role={state.role}
       pendingSync={pendingSync}
       syncError={syncError}
-      onRetrySync={() => void retrySync()}
-      onReloadCatalogue={() => void reloadCatalogue()}
+      onRetrySync={retrySync}
+      onReloadCatalogue={reloadCatalogue}
     >
       {contextHolder}
       <MaintenanceNoticeBanner />
@@ -558,6 +603,7 @@ export function App({
                 role={enforcedRole ?? state.role}
                 flexiblePricingEnabled={flexiblePricingEnabled}
                 paymentMethod={state.paymentMethod}
+                orderOnly={orderCheckoutOnly}
                 onSearchChange={state.setSearch}
                 onBarcodeLookup={handleBarcodeLookup}
                 onQuantityChange={state.updateQuantity}
@@ -594,6 +640,16 @@ export function App({
           <Route
             path="/credits"
             element={<CreditsPage sales={allSales} onRefreshSales={() => void pullSales()} />}
+          />
+          <Route
+            path="/orders"
+            element={
+              <OrdersPage
+                sales={allSales}
+                onRefreshSales={() => void pullSales()}
+                onViewReceipt={(sale) => void viewReceipt(sale)}
+              />
+            }
           />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route

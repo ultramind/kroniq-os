@@ -175,7 +175,7 @@ export function ServiceSetup() {
           renderItem={(stage) => (
             <List.Item>
               <List.Item.Meta title={`${stage.position}. ${stage.name}`} />
-              {stage.is_terminal && <Tag color="green">Terminal</Tag>}
+              {stage.is_terminal && <Tag color="success">Terminal</Tag>}
             </List.Item>
           )}
         />

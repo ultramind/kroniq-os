@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Button, Card, Space, Typography } from 'antd'
+import { Alert, Button, Card, Space, Typography, message } from 'antd'
 import { CloudSyncOutlined } from '@ant-design/icons'
 import { supabase, supabaseConfigured } from '../../supabase'
 import type { Role } from '../../types'
@@ -17,6 +17,7 @@ import { CompanyWorkspacePicker, type CompanyWorkspace } from './CompanyWorkspac
 import { useTheme } from '../../app/theme'
 import { pullProducts } from '../../sync'
 import { clearOfflineWorkspace, getOfflineWorkspace, saveOfflineWorkspace } from '../../lib/offlineWorkspace'
+import { initials } from '../../lib/initials'
 
 export function AuthGate() {
   const { mode } = useTheme()
@@ -52,6 +53,7 @@ export function AuthGate() {
     selectingWorkspaceId?: string
     workspaceError?: string
   }>({ loading: true })
+  const wasUnauthenticated = useRef(false)
   async function selectWorkspace(workspace: CompanyWorkspace) {
     if (!supabase) return
     setState((current) => ({
@@ -102,6 +104,7 @@ export function AuthGate() {
           data: { session },
         } = await within(client.auth.getSession(), 'Session check')
         if (!session) {
+          wasUnauthenticated.current = true
           clearOfflineWorkspace()
           setState({ loading: false, unauthenticated: true })
           return
@@ -254,7 +257,11 @@ export function AuthGate() {
           return
         }
         if (data.role === 'cashier' && navigator.onLine) await within(pullProducts(), 'Checkout catalogue')
-        if (redirectToDefault) navigate(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
+        if (redirectToDefault && wasUnauthenticated.current) {
+          wasUnauthenticated.current = false
+          message.success('Logged in successfully.')
+          navigate(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
+        }
         setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
       } catch (error) {
         const {
@@ -304,7 +311,11 @@ export function AuthGate() {
               alt="Company logo"
               className="relative mx-auto mb-4 h-12 w-12 object-contain"
             />
-          ) : null}
+          ) : (
+            <span className="relative mx-auto mb-4 grid h-12 w-12 place-items-center bg-[#0B1121] text-sm font-bold text-white">
+              {initials(state.tenantName ?? 'Kroniqos')}
+            </span>
+          )}
           <Typography.Title level={3} className="kroniq-loader-title relative !mb-1 !text-xl">
             {state.tenantName ?? 'Kroniqos'}
           </Typography.Title>

@@ -89,6 +89,7 @@ export function BulkCsvImportModal({
       open={open}
       title={title}
       width={760}
+      className="wide-modal"
       okText={`Import ${rows.length || ''} records`}
       okButtonProps={{ disabled: !rows.length }}
       confirmLoading={saving}

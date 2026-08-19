@@ -116,16 +116,16 @@ export function ServicesPage() {
       {holder}
       <div className="mb-6">
         <Typography.Title level={2} className="!mb-1">
-          Projects
+          Contracts
         </Typography.Title>
         <Typography.Text type="secondary">
-          Manage client projects, stages, deposits, balances, and delivery.
+          Manage client contracts, stages, deposits, balances, and delivery.
         </Typography.Text>
       </div>
       <Tabs
         defaultActiveKey="jobs"
         items={[
-          { key: 'jobs', label: 'Projects', children: jobs },
+          { key: 'jobs', label: 'Contracts', children: jobs },
           { key: 'customers', label: `Clients (${customers.length})`, children: customerDirectory },
           { key: 'setup', label: 'Services & workflow', children: <ServiceSetup /> },
         ]}

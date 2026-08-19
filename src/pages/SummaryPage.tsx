@@ -1,5 +1,5 @@
 import { PrinterOutlined } from '@ant-design/icons'
-import { Button, Card, DatePicker, Select, Statistic, Table, Tabs, Tag, message } from 'antd'
+import { Alert, Button, Card, DatePicker, Select, Statistic, Table, Tabs, Tag, message } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, useMemo, useState } from 'react'
 import { formatNaira } from '../lib/currency'
@@ -12,6 +12,7 @@ import { ServiceDashboard } from '../features/services/ServiceDashboard'
 type Period = 'day' | 'week' | 'month' | 'year'
 type RemoteExpense = { id: string; amount: number; spentAt: string; description: string }
 type RemotePayment = { id: string; amount: number; paidAt: string }
+type RemoteOrderPayment = { saleId: string; amount: number }
 type RemoteDelivery = { id: string; value: number; receivedAt: string }
 function rangeFor(period: Period, anchor: string) {
   const date = new Date(`${anchor}T12:00:00`)
@@ -37,12 +38,14 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
   const [anchor, setAnchor] = useState(new Date().toISOString().slice(0, 10))
   const [expenses, setExpenses] = useState<RemoteExpense[]>([])
   const [payments, setPayments] = useState<RemotePayment[]>([])
+  const [orderPayments, setOrderPayments] = useState<RemoteOrderPayment[]>([])
   const [deliveries, setDeliveries] = useState<RemoteDelivery[]>([])
   const [businessModes, setBusinessModes] = useState<string[]>(['retail'])
   const [dashboardTab, setDashboardTab] = useState('retail')
   const [api, holder] = message.useMessage()
   const returns = useLiveQuery(() => db.returnActivities.toArray(), []) ?? []
   const shifts = useLiveQuery(() => db.shifts.toArray(), []) ?? []
+  const saleItems = useLiveQuery(() => db.saleItems.toArray(), []) ?? []
   const { start, end } = rangeFor(period, anchor)
   useEffect(() => {
     void (async () => {
@@ -82,6 +85,7 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
       const [
         { data: expenseRows, error: expenseError },
         { data: paymentRows, error: paymentError },
+        { data: orderPaymentRows, error: orderPaymentError },
         { data: deliveryRows, error: deliveryError },
       ] = await Promise.all([
         supabase
@@ -94,13 +98,14 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
           .select('id, amount_kobo, paid_at')
           .gte('paid_at', start)
           .lte('paid_at', end),
+        supabase.from('order_payments').select('sale_id, amount_kobo'),
         supabase
           .from('supplier_deliveries')
           .select('id, quantity, unit_cost_kobo, received_at')
           .gte('received_at', start)
           .lte('received_at', end),
       ])
-      const error = expenseError ?? paymentError ?? deliveryError
+      const error = expenseError ?? paymentError ?? orderPaymentError ?? deliveryError
       if (error) {
         api.error(error.message)
         return
@@ -120,6 +125,9 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
           paidAt: row.paid_at,
         })),
       )
+      setOrderPayments(
+        (orderPaymentRows ?? []).map((row) => ({ saleId: row.sale_id, amount: row.amount_kobo / 100 })),
+      )
       setDeliveries(
         (deliveryRows ?? []).map((row) => ({
           id: row.id,
@@ -136,11 +144,54 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
         (sale) =>
           sale.createdAt.slice(0, 10) >= start &&
           sale.createdAt.slice(0, 10) <= end &&
-          sale.status !== 'returned',
+          sale.status !== 'returned' &&
+          (sale.paymentMethod !== 'order' || sale.orderStatus === 'fulfilled'),
       ),
     [end, sales, start],
   )
   const salesTotal = filteredSales.reduce((sum, sale) => sum + sale.total, 0)
+  const orders = useMemo(
+    () =>
+      sales.filter(
+        (sale) =>
+          sale.paymentMethod === 'order' &&
+          sale.status !== 'returned' &&
+          sale.createdAt.slice(0, 10) >= start &&
+          sale.createdAt.slice(0, 10) <= end,
+      ),
+    [end, sales, start],
+  )
+  const orderPaymentsBySale = orderPayments.reduce<Record<string, number>>(
+    (totals, payment) => ({ ...totals, [payment.saleId]: (totals[payment.saleId] ?? 0) + payment.amount }),
+    {},
+  )
+  const orderPaid = (sale: Sale) => (sale.creditInitialPayment ?? 0) + (orderPaymentsBySale[sale.id] ?? 0)
+  const activeOrders = orders.filter(
+    (sale) => !['fulfilled', 'cancelled'].includes(sale.orderStatus ?? 'pending'),
+  )
+  const openOrderValue = activeOrders.reduce((sum, sale) => sum + sale.total, 0)
+  const orderPaymentsReceived = activeOrders.reduce((sum, sale) => sum + orderPaid(sale), 0)
+  const orderOutstanding = activeOrders.reduce(
+    (sum, sale) => sum + Math.max(0, sale.total - orderPaid(sale)),
+    0,
+  )
+  const fulfilledOrders = orders.filter((sale) => sale.orderStatus === 'fulfilled')
+  const fulfilledOrderRevenue = fulfilledOrders.reduce((sum, sale) => sum + sale.total, 0)
+  const expectedOrderProfit = fulfilledOrders.reduce(
+    (sum, sale) =>
+      sum +
+      sale.total -
+      saleItems
+        .filter((item) => item.saleId === sale.id)
+        .reduce((cost, item) => cost + (item.costPrice ?? 0) * item.quantity, 0),
+    0,
+  )
+  const orderProfit = fulfilledOrders
+    .filter((sale) => sale.orderCost != null)
+    .reduce((sum, sale) => sum + sale.total - (sale.orderCost ?? 0), 0)
+  const dueOrders = activeOrders.filter(
+    (sale) => sale.creditDueDate && sale.creditDueDate <= dayjs().format('YYYY-MM-DD'),
+  )
   const expenseTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0)
   const creditIssued = filteredSales
     .filter((sale) => sale.paymentMethod === 'credit')
@@ -174,6 +225,76 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
   )
   const retailDashboard = (
     <div className="space-y-4">
+      {dueOrders.length ? (
+        <Alert
+          showIcon
+          type={
+            dueOrders.some((sale) => sale.creditDueDate! < dayjs().format('YYYY-MM-DD')) ? 'error' : 'warning'
+          }
+          message={`${dueOrders.length} customer order${dueOrders.length === 1 ? '' : 's'} need attention`}
+          description={dueOrders
+            .slice(0, 3)
+            .map(
+              (sale) =>
+                `${sale.creditCustomerName || 'Unnamed client'} · due ${dayjs(sale.creditDueDate).format('DD MMM')}`,
+            )
+            .join('  |  ')}
+        />
+      ) : null}
+      <Card className="overflow-hidden" bodyStyle={{ padding: 0 }}>
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+              Order pipeline
+            </p>
+            <h3 className="mb-0 text-lg font-semibold text-[var(--text)]">Made-to-order performance</h3>
+          </div>
+          <span className="whitespace-nowrap border border-[var(--border)] px-2 py-1 text-xs font-medium text-[var(--muted)]">
+            {activeOrders.length} open
+          </span>
+        </div>
+        <div className="grid grid-cols-2 divide-y divide-[var(--border)] sm:divide-x sm:divide-y-0 xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
+          <div className="col-span-2 bg-[#0B1121] p-5 text-white sm:col-span-1 sm:row-span-2">
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-300">
+              Open order value
+            </p>
+            <p className="mb-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+              {formatNaira(openOrderValue)}
+            </p>
+            <div className="border-t border-white/15 pt-3 text-sm text-slate-300">
+              {activeOrders.length} active order{activeOrders.length === 1 ? '' : 's'} awaiting fulfilment
+            </div>
+          </div>
+          <div className="p-4 sm:p-5">
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Payments received</p>
+            <p className="mb-0 text-xl font-semibold text-[var(--text)]">
+              {formatNaira(orderPaymentsReceived)}
+            </p>
+          </div>
+          <div className="p-4 sm:p-5">
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Outstanding balance</p>
+            <p className="mb-0 text-xl font-semibold text-[var(--text)]">{formatNaira(orderOutstanding)}</p>
+          </div>
+          <div className="p-4 sm:p-5">
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Fulfilled revenue</p>
+            <p className="mb-0 text-xl font-semibold text-[var(--text)]">
+              {formatNaira(fulfilledOrderRevenue)}
+            </p>
+          </div>
+          <div className="p-4 sm:p-5">
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Expected profit</p>
+            <p className="mb-0 text-xl font-semibold text-[var(--text)]">
+              {formatNaira(expectedOrderProfit)}
+            </p>
+            <p className="mb-0 mt-1 text-[11px] text-[var(--muted)]">Catalogue cost basis</p>
+          </div>
+          <div className="p-4 sm:p-5">
+            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Actual profit</p>
+            <p className="mb-0 text-xl font-semibold text-[var(--text)]">{formatNaira(orderProfit)}</p>
+            <p className="mb-0 mt-1 text-[11px] text-[var(--muted)]">Final cost recorded</p>
+          </div>
+        </div>
+      </Card>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Card>
           <Statistic

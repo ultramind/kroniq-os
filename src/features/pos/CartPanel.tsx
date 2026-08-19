@@ -1,4 +1,11 @@
-import { MinusOutlined, MonitorOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
+import {
+  ClearOutlined,
+  DeleteOutlined,
+  MinusOutlined,
+  MonitorOutlined,
+  PlusOutlined,
+  ShoppingCartOutlined,
+} from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -6,6 +13,7 @@ import {
   Checkbox,
   DatePicker,
   Empty,
+  Form,
   Input,
   InputNumber,
   Modal,
@@ -29,6 +37,7 @@ const methods: { id: PaymentMethod; label: string }[] = [
   { id: 'cash', label: 'Cash' },
   { id: 'card', label: 'Card / POS' },
   { id: 'transfer', label: 'Transfer' },
+  { id: 'order', label: 'Order' },
   { id: 'credit', label: 'Credit' },
 ]
 
@@ -59,7 +68,9 @@ type Props = {
   historicalSaving?: boolean
   checkoutSaving?: boolean
   onHold: () => void
+  onClearCart: () => void
   onOpenCustomerDisplay: () => void
+  orderOnly?: boolean
   children?: React.ReactNode
 }
 
@@ -78,7 +89,9 @@ export function CartPanel({
   historicalSaving = false,
   checkoutSaving = false,
   onHold,
+  onClearCart,
   onOpenCustomerDisplay,
+  orderOnly = false,
   children,
 }: Props) {
   const [cashReceived, setCashReceived] = useState<number | null>(null)
@@ -89,7 +102,9 @@ export function CartPanel({
   const [creditInitialPayment, setCreditInitialPayment] = useState<number | null>(null)
   const [creditModalOpen, setCreditModalOpen] = useState(false)
   const [creditError, setCreditError] = useState('')
+  const [clientForm] = Form.useForm()
   const [creditors, setCreditors] = useState<Creditor[]>([])
+  const [selectedCreditorKey, setSelectedCreditorKey] = useState<string | undefined>()
   const [loadingCreditors, setLoadingCreditors] = useState(false)
   const [saleDate, setSaleDate] = useState(() => dayjs().format('YYYY-MM-DD'))
   const [deductStock, setDeductStock] = useState(false)
@@ -98,15 +113,23 @@ export function CartPanel({
   const canRecordHistorical = role === 'admin' || role === 'manager'
   const change = cashReceived === null ? null : Math.max(0, cashReceived - total)
   const cashIsInsufficient = paymentMethod === 'cash' && (cashReceived === null || cashReceived < total)
+  const needsClientDetails = paymentMethod === 'credit' || paymentMethod === 'order'
+  const availableMethods = orderOnly ? methods.filter((method) => method.id === 'order') : methods
   const creditDetailsMissing =
-    paymentMethod === 'credit' && (!creditCustomerName.trim() || !creditCustomerPhone.trim())
+    needsClientDetails && (!creditCustomerName.trim() || !creditCustomerPhone.trim())
 
-  function clearCreditDetails() {
+  function resetCreditDetails() {
     setCreditCustomerName('')
     setCreditCustomerPhone('')
     setCreditDueDate('')
     setCreditInitialPayment(null)
+    setSelectedCreditorKey(undefined)
     setCreditError('')
+    clientForm.resetFields()
+  }
+
+  function clearCreditDetails() {
+    resetCreditDetails()
     setCreditModalOpen(false)
   }
 
@@ -127,13 +150,23 @@ export function CartPanel({
   useEffect(() => {
     if (!creditModalOpen) return
 
+    clientForm.setFieldsValue({
+      customerName: creditCustomerName,
+      customerPhone: creditCustomerPhone,
+      initialPayment: creditInitialPayment,
+      dueDate: creditDueDate ? dayjs(creditDueDate) : undefined,
+    })
+
     void (async () => {
       setLoadingCreditors(true)
       try {
         const localSales = await db.sales.toArray()
         const known: Creditor[] = localSales
           .filter(
-            (sale) => sale.paymentMethod === 'credit' && sale.creditCustomerName && sale.creditCustomerPhone,
+            (sale) =>
+              ['credit', 'order'].includes(sale.paymentMethod) &&
+              sale.creditCustomerName &&
+              sale.creditCustomerPhone,
           )
           .map((sale) => ({
             key: `credit:${sale.creditCustomerName!.trim().toLowerCase()}|${sale.creditCustomerPhone!.trim()}`,
@@ -174,7 +207,7 @@ export function CartPanel({
         setLoadingCreditors(false)
       }
     })()
-  }, [creditModalOpen])
+  }, [clientForm, creditModalOpen])
 
   function selectPaymentMethod(method: PaymentMethod) {
     onMethodChange(method)
@@ -182,19 +215,24 @@ export function CartPanel({
       setCashEntryManual(false)
       setCashReceived(total)
     }
-    if (method === 'credit') {
+    if (method === 'credit' || method === 'order') {
       setCreditError('')
       setCreditModalOpen(true)
     }
   }
 
-  function confirmCreditDetails() {
+  async function confirmCreditDetails() {
     if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) {
-      setCreditError('Customer name and phone number are required for credit sales.')
+      setCreditError(`Client name and phone number are required for ${paymentMethod} records.`)
       return
     }
-    setCreditError('')
-    setCreditModalOpen(false)
+    try {
+      await clientForm.validateFields()
+      setCreditError('')
+      setCreditModalOpen(false)
+    } catch {
+      // Ant Design renders the field-level validation messages.
+    }
   }
 
   return (
@@ -220,6 +258,16 @@ export function CartPanel({
           <Button danger className="!h-10 !px-4 !text-sm" disabled={!cart.length} onClick={onHold}>
             Hold sale
           </Button>
+          <Tooltip title="Clear cart">
+            <Button
+              danger
+              aria-label="Clear current cart"
+              className="!h-10 !w-10 !text-base"
+              disabled={!cart.length}
+              icon={<DeleteOutlined />}
+              onClick={onClearCart}
+            />
+          </Tooltip>
         </Space>
       }
       bodyStyle={{ padding: 20 }}
@@ -236,7 +284,7 @@ export function CartPanel({
               <div>
                 <Text strong>{item.name}</Text>
                 <br />
-                {isHistorical ? (
+                {isHistorical && paymentMethod !== 'order' ? (
                   <div className="mt-2">
                     <Text type="secondary" className="mb-1 block text-xs">
                       Unit price
@@ -302,7 +350,7 @@ export function CartPanel({
       {canRecordHistorical && (
         <div className="mb-4">
           <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="sale-date">
-            Sale date
+            {paymentMethod === 'order' ? 'Order date' : 'Sale date'}
           </label>
           <DatePicker
             id="sale-date"
@@ -325,22 +373,32 @@ export function CartPanel({
                 showIcon
                 message={
                   <span>
-                    <strong>{deductStock ? 'Stock correction enabled' : 'Historical sale'}</strong>
+                    <strong>
+                      {paymentMethod === 'order'
+                        ? 'Backdated order'
+                        : deductStock
+                          ? 'Stock correction enabled'
+                          : 'Historical sale'}
+                    </strong>
                     <span className="historical-sale-notice-copy">
-                      {deductStock
-                        ? ' Reduces current stock; excluded from today’s cash shift.'
-                        : ' Reports on the selected date only; current stock stays unchanged.'}
+                      {paymentMethod === 'order'
+                        ? ' Records the order on the selected date; stock remains unchanged.'
+                        : deductStock
+                          ? ' Reduces current stock; excluded from today’s cash shift.'
+                          : ' Reports on the selected date only; current stock stays unchanged.'}
                     </span>
                   </span>
                 }
               />
-              <Checkbox
-                className="mt-2"
-                checked={deductStock}
-                onChange={(event) => setDeductStock(event.target.checked)}
-              >
-                Deduct items from current stock
-              </Checkbox>
+              {paymentMethod !== 'order' ? (
+                <Checkbox
+                  className="mt-2"
+                  checked={deductStock}
+                  onChange={(event) => setDeductStock(event.target.checked)}
+                >
+                  Deduct items from current stock
+                </Checkbox>
+              ) : null}
             </>
           )}
         </div>
@@ -359,12 +417,12 @@ export function CartPanel({
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3">
-        {methods.map((method) => (
+        {availableMethods.map((method) => (
           <Button
             key={method.id}
             size="large"
             danger={method.id === 'credit'}
-            className={`touch-target text-base active:scale-[0.98] ${method.id === 'credit' && paymentMethod === method.id ? '!bg-red-600 !text-white hover:!bg-red-500' : ''}`}
+            className={`touch-target text-base active:scale-[0.98] ${method.id === 'credit' && paymentMethod === method.id ? '!bg-red-600 !text-white hover:!bg-red-500' : ''} ${method.id === 'order' && paymentMethod === method.id ? '!border-amber-500 !bg-amber-500 !text-white hover:!bg-amber-400' : ''}`}
             type={paymentMethod === method.id ? 'primary' : 'default'}
             onClick={() => selectPaymentMethod(method.id)}
           >
@@ -447,6 +505,23 @@ export function CartPanel({
           </Button>
         </div>
       )}
+      {paymentMethod === 'order' && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <div>
+            <Text strong className="text-amber-900">
+              Customer order
+            </Text>
+            <Text className="block text-xs text-amber-800">
+              {creditCustomerName
+                ? `${creditCustomerName} · deposit ${formatNaira(creditInitialPayment ?? 0)} · stock will not be reduced`
+                : 'Client details required · stock will not be reduced'}
+            </Text>
+          </div>
+          <Button size="small" onClick={() => setCreditModalOpen(true)}>
+            Edit details
+          </Button>
+        </div>
+      )}
 
       <Button
         type="primary"
@@ -462,118 +537,164 @@ export function CartPanel({
           (isHistorical && !onHistoricalCheckout)
         }
         onClick={() => {
-          const credit =
-            paymentMethod === 'credit'
-              ? {
-                  customerName: creditCustomerName.trim(),
-                  customerPhone: creditCustomerPhone.trim(),
-                  dueDate: creditDueDate || undefined,
-                  initialPayment: creditInitialPayment ?? 0,
-                }
-              : undefined
+          if (needsClientDetails && creditDetailsMissing) {
+            setCreditError(`Client name and phone number are required for ${paymentMethod} records.`)
+            setCreditModalOpen(true)
+            return
+          }
+          const credit = needsClientDetails
+            ? {
+                customerName: creditCustomerName.trim(),
+                customerPhone: creditCustomerPhone.trim(),
+                dueDate: creditDueDate || undefined,
+                initialPayment: creditInitialPayment ?? 0,
+              }
+            : undefined
           if (isHistorical) onHistoricalCheckout?.(credit, saleDate, deductStock)
           else onCheckout(credit)
-          if (paymentMethod === 'credit') clearCreditDetails()
+          if (needsClientDetails) clearCreditDetails()
         }}
       >
         {isHistorical
-          ? `${deductStock ? 'Record and deduct stock' : 'Record historical sale'} · ${formatNaira(total)}`
-          : `Complete sale · ${formatNaira(total)}`}
+          ? `${paymentMethod === 'order' ? 'Record backdated order' : deductStock ? 'Record and deduct stock' : 'Record historical sale'} · ${formatNaira(total)}`
+          : `${paymentMethod === 'order' ? 'Record order' : 'Complete sale'} · ${formatNaira(total)}`}
       </Button>
       {children && <div className="mt-5">{children}</div>}
       <Modal
         open={creditModalOpen}
-        title="Customer credit details"
-        okText="Use credit details"
-        onOk={confirmCreditDetails}
-        onCancel={() => {
-          setCreditModalOpen(false)
-          if (!creditCustomerName.trim() || !creditCustomerPhone.trim()) onMethodChange('cash')
-        }}
+        title={paymentMethod === 'order' ? 'Customer order details' : 'Customer credit details'}
+        footer={
+          <Space>
+            <Button onClick={clearCreditDetails}>Cancel</Button>
+            <Button icon={<ClearOutlined />} onClick={resetCreditDetails}>
+              Clear
+            </Button>
+            <Button type="primary" onClick={() => void confirmCreditDetails()}>
+              {paymentMethod === 'order' ? 'Use order details' : 'Use credit details'}
+            </Button>
+          </Space>
+        }
+        onCancel={clearCreditDetails}
         destroyOnClose={false}
+        width={460}
       >
-        <div className="space-y-4 pt-2">
-          {creditError && <Alert type="error" showIcon message={creditError} />}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Existing creditor <span className="font-normal text-slate-400">(optional)</span>
-            </label>
-            <Select
-              showSearch
-              allowClear
-              loading={loadingCreditors}
-              optionFilterProp="label"
-              placeholder="Search previous creditor or client"
-              size="large"
-              className="w-full"
-              options={creditors.map((creditor) => ({
-                value: creditor.key,
-                label: `${creditor.name} · ${creditor.phone}`,
-              }))}
-              onChange={(value) => {
-                const creditor = creditors.find((item) => item.key === value)
-                if (creditor) {
-                  setCreditCustomerName(creditor.name)
-                  setCreditCustomerPhone(creditor.phone)
-                  setCreditError('')
-                }
-              }}
-            />
-          </div>
-          <div className="border-t border-slate-200 pt-4">
-            <Text type="secondary" className="mb-3 block text-xs">
-              Or add a new creditor
-            </Text>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Customer full name</label>
-                <Input
-                  value={creditCustomerName}
-                  onChange={(event) => setCreditCustomerName(event.target.value)}
-                  placeholder="Customer full name"
-                  size="large"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Phone number</label>
-                <Input
-                  value={creditCustomerPhone}
-                  onChange={(event) => setCreditCustomerPhone(event.target.value)}
-                  placeholder="Phone number"
-                  inputMode="tel"
-                  size="large"
-                />
+        <Form form={clientForm} layout="vertical" className="pt-1">
+          <div className="space-y-3">
+            {creditError && <Alert type="error" showIcon message={creditError} />}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Existing client <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <Select
+                showSearch
+                allowClear
+                value={selectedCreditorKey}
+                loading={loadingCreditors}
+                optionFilterProp="label"
+                placeholder="Search previous creditor or client"
+                size="large"
+                className="w-full"
+                options={creditors.map((creditor) => ({
+                  value: creditor.key,
+                  label: `${creditor.name} · ${creditor.phone}`,
+                }))}
+                onChange={(value) => {
+                  setSelectedCreditorKey(value)
+                  const creditor = creditors.find((item) => item.key === value)
+                  if (creditor) {
+                    setCreditCustomerName(creditor.name)
+                    setCreditCustomerPhone(creditor.phone)
+                    clientForm.setFieldsValue({ customerName: creditor.name, customerPhone: creditor.phone })
+                    setCreditError('')
+                  }
+                }}
+              />
+            </div>
+            <div className="border-t border-slate-200 pt-3">
+              <Text type="secondary" className="mb-2 block text-xs">
+                Or add a new creditor
+              </Text>
+              <div className="space-y-3">
+                <Form.Item
+                  name="customerName"
+                  label="Customer full name"
+                  rules={[{ required: true, whitespace: true, message: 'Enter the client name.' }]}
+                  className="mb-0"
+                >
+                  <Input
+                    value={creditCustomerName}
+                    onChange={(event) => setCreditCustomerName(event.target.value)}
+                    placeholder="Customer full name"
+                    size="large"
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="customerPhone"
+                  label="Phone number"
+                  rules={[
+                    { required: true, whitespace: true, message: 'Enter the client phone number.' },
+                    { min: 7, message: 'Enter a valid phone number.' },
+                  ]}
+                  className="mb-0"
+                >
+                  <Input
+                    value={creditCustomerPhone}
+                    onChange={(event) => setCreditCustomerPhone(event.target.value)}
+                    placeholder="Phone number"
+                    inputMode="tel"
+                    size="large"
+                  />
+                </Form.Item>
               </div>
             </div>
+            <Form.Item
+              name="initialPayment"
+              label={
+                <>
+                  Initial payment <span className="font-normal text-slate-400">(optional)</span>
+                </>
+              }
+              rules={[
+                {
+                  validator: (_, value) =>
+                    value == null || (Number(value) >= 0 && Number(value) <= total)
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('Initial payment cannot exceed the order total.')),
+                },
+              ]}
+              className="mb-0"
+            >
+              <CurrencyInput
+                value={creditInitialPayment}
+                onChange={(value) => setCreditInitialPayment(typeof value === 'number' ? value : null)}
+                min={0}
+                max={total}
+                precision={2}
+                placeholder="₦0.00"
+                size="large"
+                className="w-full"
+              />
+            </Form.Item>
+            <Form.Item
+              name="dueDate"
+              label={
+                <>
+                  {paymentMethod === 'order' ? 'Expected delivery date' : 'Expected payment date'}{' '}
+                  <span className="font-normal text-slate-400">(optional)</span>
+                </>
+              }
+              className="mb-0"
+            >
+              <DatePicker
+                value={creditDueDate ? dayjs(creditDueDate) : null}
+                onChange={(value) => setCreditDueDate(value?.format('YYYY-MM-DD') ?? '')}
+                format="DD MMM YYYY"
+                size="large"
+                className="w-full"
+              />
+            </Form.Item>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Initial payment <span className="font-normal text-slate-400">(optional)</span>
-            </label>
-            <CurrencyInput
-              value={creditInitialPayment}
-              onChange={(value) => setCreditInitialPayment(typeof value === 'number' ? value : null)}
-              min={0}
-              max={total}
-              precision={2}
-              placeholder="₦0.00"
-              size="large"
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Expected payment date <span className="font-normal text-slate-400">(optional)</span>
-            </label>
-            <DatePicker
-              value={creditDueDate ? dayjs(creditDueDate) : null}
-              onChange={(value) => setCreditDueDate(value?.format('YYYY-MM-DD') ?? '')}
-              format="DD MMM YYYY"
-              size="large"
-              className="w-full"
-            />
-          </div>
-        </div>
+        </Form>
       </Modal>
     </Card>
   )

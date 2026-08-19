@@ -1,5 +1,19 @@
-import { Button, Card, message, Modal, Progress, Statistic, Table, Tag } from 'antd'
+import {
+  Button,
+  Card,
+  DatePicker,
+  Input,
+  message,
+  Modal,
+  Progress,
+  Select,
+  Statistic,
+  Table,
+  Tag,
+} from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
 import { useEffect, useMemo, useState } from 'react'
+import dayjs, { type Dayjs } from 'dayjs'
 import { CreditPaymentModal } from '../features/sales/CreditPaymentModal'
 import { formatNaira } from '../lib/currency'
 import { supabase } from '../supabase'
@@ -10,6 +24,10 @@ export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefres
   const [selectedSale, setSelectedSale] = useState<Sale>()
   const [historySale, setHistorySale] = useState<Sale>()
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'outstanding' | 'overdue' | 'paid'>('all')
+  const [period, setPeriod] = useState<'all' | 'day' | 'week' | 'month'>('all')
+  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null)
   const [messageApi, contextHolder] = message.useMessage()
   const loadPayments = async () => {
     if (!supabase) return
@@ -44,10 +62,38 @@ export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefres
   )
   const balance = (sale: Sale) =>
     Math.max(0, sale.total - (sale.creditInitialPayment ?? 0) - (paidBySale[sale.id] ?? 0))
-  const outstanding = creditSales.filter((sale) => balance(sale) > 0)
-  const outstandingTotal = outstanding.reduce((sum, sale) => sum + balance(sale), 0)
-  const paidTotal = creditSales.reduce((sum, sale) => sum + sale.total - balance(sale), 0)
   const today = new Date().toISOString().slice(0, 10)
+
+  function changePeriod(value: 'all' | 'day' | 'week' | 'month') {
+    setPeriod(value)
+    setSelectedDate(null)
+  }
+  const filteredCreditSales = creditSales
+    .filter((sale) => {
+      const haystack =
+        `${sale.creditCustomerName ?? ''} ${sale.creditCustomerPhone ?? ''} ${sale.receiptNo}`.toLowerCase()
+      const overdue = Boolean(sale.creditDueDate && sale.creditDueDate < today)
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'paid' && balance(sale) === 0) ||
+        (statusFilter === 'overdue' && balance(sale) > 0 && overdue) ||
+        (statusFilter === 'outstanding' && balance(sale) > 0 && !overdue)
+      const created = dayjs(sale.createdAt)
+      const matchesDate = selectedDate
+        ? created.isSame(selectedDate, 'day')
+        : period === 'day'
+          ? created.isSame(dayjs(), 'day')
+          : period === 'week'
+            ? created.isSame(dayjs(), 'week')
+            : period === 'month'
+              ? created.isSame(dayjs(), 'month')
+              : true
+      return haystack.includes(search.trim().toLowerCase()) && matchesStatus && matchesDate
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const outstanding = filteredCreditSales.filter((sale) => balance(sale) > 0)
+  const outstandingTotal = outstanding.reduce((sum, sale) => sum + balance(sale), 0)
+  const paidTotal = filteredCreditSales.reduce((sum, sale) => sum + sale.total - balance(sale), 0)
   async function recordPayment(values: { amount: number; paidAt: string }) {
     if (!selectedSale || !supabase) return
     if (values.amount > balance(selectedSale)) {
@@ -82,6 +128,12 @@ export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefres
       dataIndex: 'creditCustomerPhone',
       key: 'phone',
       render: (value: string | undefined) => value ?? '—',
+    },
+    {
+      title: 'Receipt no.',
+      dataIndex: 'receiptNo',
+      key: 'receiptNo',
+      render: (value: string) => <span className="font-medium">{value}</span>,
     },
     { title: 'Total', dataIndex: 'total', key: 'total', render: (value: number) => formatNaira(value) },
     {
@@ -162,18 +214,71 @@ export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefres
         </Card>
       </div>
       <Card title="Customer credit register" extra="Record and track instalment payments">
+        <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_150px_180px_250px_auto]">
+          <Input.Search
+            allowClear
+            size="large"
+            className="credit-search"
+            enterButton={<Button type="primary" icon={<SearchOutlined />} aria-label="Search credits" />}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search customer, phone, or receipt"
+          />
+          <Select
+            value={statusFilter}
+            size="large"
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: 'All statuses' },
+              { value: 'outstanding', label: 'Outstanding' },
+              { value: 'overdue', label: 'Overdue' },
+              { value: 'paid', label: 'Paid' },
+            ]}
+          />
+          <Select
+            value={period}
+            size="large"
+            onChange={changePeriod}
+            options={[
+              { value: 'all', label: 'All dates' },
+              { value: 'day', label: 'Today' },
+              { value: 'week', label: 'This week' },
+              { value: 'month', label: 'This month' },
+            ]}
+          />
+          <DatePicker
+            value={selectedDate}
+            size="large"
+            onChange={(value) => {
+              setSelectedDate(value)
+              setPeriod('all')
+            }}
+            className="w-full"
+          />
+          <Button
+            size="large"
+            onClick={() => {
+              setSearch('')
+              setStatusFilter('all')
+              changePeriod('all')
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
         <Table
           rowKey="id"
           columns={columns}
-          dataSource={creditSales}
+          dataSource={filteredCreditSales}
           pagination={{ pageSize: 12 }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1120 }}
           locale={{ emptyText: 'No customer credit recorded yet.' }}
         />
       </Card>
       <CreditPaymentModal
         open={Boolean(selectedSale)}
         maxAmount={selectedSale ? balance(selectedSale) : 0}
+        saving={saving}
         onClose={() => setSelectedSale(undefined)}
         onSave={recordPayment}
       />

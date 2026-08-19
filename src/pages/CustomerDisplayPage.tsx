@@ -12,6 +12,7 @@ const paymentLabels = {
   card: 'Card / POS payment',
   transfer: 'Bank transfer',
   credit: 'Credit sale',
+  order: 'Customer order',
 }
 
 export function CustomerDisplayPage() {

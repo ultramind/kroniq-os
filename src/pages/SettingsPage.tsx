@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { Button, Card, Form, Input, InputNumber, Select, Switch, Tabs, message } from 'antd'
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Switch, Tabs, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { SeedStarterCatalogue } from '../features/admin/SeedStarterCatalogue'
@@ -17,6 +17,8 @@ import {
 } from '../lib/storeSettings'
 import { supabase } from '../supabase'
 import type { Role } from '../types'
+import { clearLocalPosDataForNewTenant } from '../db'
+import { clearOfflineWorkspace } from '../lib/offlineWorkspace'
 
 type Values = StoreSettings
 
@@ -165,6 +167,20 @@ export function SettingsPage({ role }: { role: Role }) {
       ]}
     />
   )
+  const clearDeviceWorkspace = () => {
+    Modal.confirm({
+      title: 'Clear local device records?',
+      content:
+        'This removes cached products, sales, reports, and pending records from this device only. It does not delete data in the current company database.',
+      okText: 'Clear local records',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await clearLocalPosDataForNewTenant()
+        clearOfflineWorkspace()
+        window.location.reload()
+      },
+    })
+  }
   return (
     <>
       {holder}
@@ -194,6 +210,15 @@ export function SettingsPage({ role }: { role: Role }) {
                   <div className="flex flex-wrap gap-3">
                     <SeedStarterCatalogue />
                     <RemoveStarterCatalogue />
+                  </div>
+                  <div className="mt-6 border-t border-slate-200 pt-5">
+                    <p className="mb-3 text-sm text-slate-500">
+                      Use this after changing or deleting a company to remove old offline records from this
+                      device.
+                    </p>
+                    <Button danger onClick={clearDeviceWorkspace}>
+                      Clear local device records
+                    </Button>
                   </div>
                 </Card>
               ),

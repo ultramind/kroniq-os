@@ -39,6 +39,8 @@ export function RecentSales({ sales, role, onViewReceipt, onReturnSale }: Props)
           <Tag color="warning">Stock review</Tag>
         ) : sale.historical ? (
           <Tag color="blue">Historical</Tag>
+        ) : sale.paymentMethod === 'order' ? (
+          <Tag color="gold">Order · {sale.orderStatus ?? 'pending'}</Tag>
         ) : (
           <Tag color={sale.synced ? 'success' : 'gold'}>{sale.synced ? 'Synced' : 'Queued'}</Tag>
         ),

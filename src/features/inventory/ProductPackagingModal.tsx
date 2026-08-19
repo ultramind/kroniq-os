@@ -135,6 +135,7 @@ export function ProductPackagingModal({
       onCancel={onClose}
       footer={<Button onClick={onClose}>Done</Button>}
       width={760}
+      className="wide-modal"
       destroyOnClose
     >
       {holder}

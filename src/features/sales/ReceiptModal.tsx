@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Descriptions, Divider, Modal, Space, Typography } from 'antd'
 import { PrinterOutlined } from '@ant-design/icons'
 import { formatNaira } from '../../lib/currency'
+import { initials } from '../../lib/initials'
 import type { ReceiptItem, Sale } from '../../types'
 import { getStoreSettings } from '../../lib/storeSettings'
 import { supabase } from '../../supabase'
@@ -32,7 +33,7 @@ export function ReceiptModal({ sale, items, onClose }: Props) {
   return (
     <Modal
       open
-      title="Sale complete"
+      title={sale.paymentMethod === 'order' ? 'Order receipt' : 'Sale complete'}
       onCancel={onClose}
       footer={
         <Space>
@@ -51,7 +52,11 @@ export function ReceiptModal({ sale, items, onClose }: Props) {
               alt={`${businessName} logo`}
               className="mx-auto mb-2 h-12 max-w-40 object-contain"
             />
-          ) : null}
+          ) : (
+            <span className="mx-auto mb-2 grid h-12 w-12 place-items-center bg-[#0B1121] text-sm font-bold text-white">
+              {initials(businessName)}
+            </span>
+          )}
           <Title level={4} className="!mb-1">
             {businessName}
           </Title>
@@ -89,10 +94,12 @@ export function ReceiptModal({ sale, items, onClose }: Props) {
           <Text strong>Total</Text>
           <Text strong>{formatNaira(sale.total)}</Text>
         </div>
-        {sale.paymentMethod === 'credit' && (
+        {(sale.paymentMethod === 'credit' || sale.paymentMethod === 'order') && (
           <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
             <div className="flex justify-between">
-              <Text type="secondary">Initial deposit</Text>
+              <Text type="secondary">
+                {sale.paymentMethod === 'order' ? 'Amount paid' : 'Initial deposit'}
+              </Text>
               <Text>{formatNaira(initialPayment)}</Text>
             </div>
             <div className="flex justify-between text-base">

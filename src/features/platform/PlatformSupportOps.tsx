@@ -82,6 +82,9 @@ export function PlatformSupportPage({ organizations }: { organizations: Organiza
   const [sessions, setSessions] = useState<SupportSession[]>([])
   const [loading, setLoading] = useState(true)
   const [accessFor, setAccessFor] = useState<Organization>()
+  const [savingAccess, setSavingAccess] = useState(false)
+  const [updatingTicketId, setUpdatingTicketId] = useState<string>()
+  const [endingSessionId, setEndingSessionId] = useState<string>()
   const [form] = Form.useForm<{ reason: string; minutes: number }>()
   const [api, holder] = message.useMessage()
   const organizationNames = useMemo(
@@ -112,47 +115,62 @@ export function PlatformSupportPage({ organizations }: { organizations: Organiza
   }, [load])
   const changeTicketStatus = async (ticket: Ticket, status: string) => {
     if (!supabase) return
-    const { error } = await supabase
-      .from('support_tickets')
-      .update({
-        status,
-        resolved_at: status === 'resolved' || status === 'closed' ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', ticket.id)
-    if (error) api.error(error.message)
-    else {
-      api.success('Ticket updated.')
-      void load()
+    setUpdatingTicketId(ticket.id)
+    try {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({
+          status,
+          resolved_at: status === 'resolved' || status === 'closed' ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ticket.id)
+      if (error) api.error(error.message)
+      else {
+        api.success('Ticket updated.')
+        await load()
+      }
+    } finally {
+      setUpdatingTicketId(undefined)
     }
   }
   const startSession = async ({ reason, minutes }: { reason: string; minutes: number }) => {
     if (!supabase || !accessFor) return
-    const { error } = await supabase.rpc('begin_platform_support_session', {
-      p_organization_id: accessFor.id,
-      p_reason: reason,
-      p_minutes: minutes,
-    })
-    if (error) {
-      api.error(error.message)
-      return
+    setSavingAccess(true)
+    try {
+      const { error } = await supabase.rpc('begin_platform_support_session', {
+        p_organization_id: accessFor.id,
+        p_reason: reason,
+        p_minutes: minutes,
+      })
+      if (error) {
+        api.error(error.message)
+        return
+      }
+      api.success(`Read-only support access started for ${minutes} minutes.`)
+      navigate(`/platform/organisations/${accessFor.id}?support=true`)
+      setAccessFor(undefined)
+      form.resetFields()
+      await load()
+    } finally {
+      setSavingAccess(false)
     }
-    api.success(`Read-only support access started for ${minutes} minutes.`)
-    navigate(`/platform/organisations/${accessFor.id}?support=true`)
-    setAccessFor(undefined)
-    form.resetFields()
-    void load()
   }
   const endSession = async (sessionId: string) => {
     if (!supabase) return
-    const { error } = await supabase.rpc('end_platform_support_session', {
-      p_session_id: sessionId,
-      p_reason: 'Ended by platform admin',
-    })
-    if (error) api.error(error.message)
-    else {
-      api.success('Support access ended and recorded.')
-      void load()
+    setEndingSessionId(sessionId)
+    try {
+      const { error } = await supabase.rpc('end_platform_support_session', {
+        p_session_id: sessionId,
+        p_reason: 'Ended by platform admin',
+      })
+      if (error) api.error(error.message)
+      else {
+        api.success('Support access ended and recorded.')
+        await load()
+      }
+    } finally {
+      setEndingSessionId(undefined)
     }
   }
   return (
@@ -191,6 +209,8 @@ export function PlatformSupportPage({ organizations }: { organizations: Organiza
                     key="status"
                     size="small"
                     value={ticket.status}
+                    loading={updatingTicketId === ticket.id}
+                    disabled={Boolean(updatingTicketId)}
                     onChange={(status) => void changeTicketStatus(ticket, status)}
                     options={['open', 'in_progress', 'resolved', 'closed'].map((status) => ({
                       value: status,
@@ -251,7 +271,14 @@ export function PlatformSupportPage({ organizations }: { organizations: Organiza
             renderItem={(session) => (
               <List.Item
                 actions={[
-                  <Button key="end" danger type="link" onClick={() => void endSession(session.id)}>
+                  <Button
+                    key="end"
+                    danger
+                    type="link"
+                    loading={endingSessionId === session.id}
+                    disabled={Boolean(endingSessionId)}
+                    onClick={() => void endSession(session.id)}
+                  >
                     End
                   </Button>,
                 ]}
@@ -269,6 +296,8 @@ export function PlatformSupportPage({ organizations }: { organizations: Organiza
         title={`Start support access${accessFor ? ` · ${accessFor.name}` : ''}`}
         open={Boolean(accessFor)}
         okText="Start audited access"
+        confirmLoading={savingAccess}
+        cancelButtonProps={{ disabled: savingAccess }}
         onOk={() => void form.submit()}
         onCancel={() => setAccessFor(undefined)}
       >

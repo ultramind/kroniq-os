@@ -33,7 +33,15 @@ export function StockAdjustmentModal({ product, open, saving, onClose, onSave }:
         <Form.Item
           name="quantityDelta"
           label="Quantity change"
-          rules={[{ required: true, message: 'Enter the stock change' }]}
+          rules={[
+            { required: true, message: 'Enter the stock change.' },
+            {
+              validator: (_, value) =>
+                Number(value) === 0
+                  ? Promise.reject(new Error('Enter a quantity greater than or less than zero.'))
+                  : Promise.resolve(),
+            },
+          ]}
           extra="Use a positive number for stock in and a negative number for stock out."
         >
           <InputNumber precision={0} className="w-full" />

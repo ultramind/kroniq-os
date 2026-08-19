@@ -8,11 +8,13 @@ type FormValues = { amount: number; paidAt: Dayjs }
 export function CreditPaymentModal({
   open,
   maxAmount,
+  saving = false,
   onClose,
   onSave,
 }: {
   open: boolean
   maxAmount: number
+  saving?: boolean
   onClose: () => void
   onSave: (values: Values) => Promise<void>
 }) {
@@ -27,6 +29,8 @@ export function CreditPaymentModal({
       forceRender
       title="Record credit payment"
       okText="Record payment"
+      confirmLoading={saving}
+      cancelButtonProps={{ disabled: saving }}
       onCancel={onClose}
       onOk={() => void form.submit()}
     >

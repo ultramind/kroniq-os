@@ -29,6 +29,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, supabaseConfigured } from '../supabase'
 import type { Role } from '../types'
 import { usePosStore } from '../store'
+import { initials } from '../lib/initials'
 import { useTheme } from './theme'
 
 const { Header, Content, Footer, Sider } = Layout
@@ -38,8 +39,8 @@ type Props = {
   role: Role
   pendingSync: number
   syncError?: string
-  onRetrySync?: () => void
-  onReloadCatalogue?: () => void
+  onRetrySync?: () => Promise<void>
+  onReloadCatalogue?: () => Promise<void>
   children: React.ReactNode
 }
 
@@ -53,6 +54,8 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const [userName, setUserName] = useState('Account')
   const [tenantBrand, setTenantBrand] = useState({ name: 'Kroniqos', logoUrl: '' })
   const [cartReceiving, setCartReceiving] = useState(false)
+  const [retryingSync, setRetryingSync] = useState(false)
+  const [reloadingCatalogue, setReloadingCatalogue] = useState(false)
   const [online, setOnline] = useState(() => navigator.onLine)
   useEffect(() => {
     const setOnlineStatus = () => setOnline(navigator.onLine)
@@ -122,23 +125,25 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
               ? 'reports'
               : pathname.startsWith('/credits')
                 ? 'credits'
-                : pathname.startsWith('/expenses')
-                  ? 'expenses'
-                  : pathname.startsWith('/products')
-                    ? 'products'
-                    : pathname.startsWith('/deliveries')
-                      ? 'deliveries'
-                      : pathname.startsWith('/warehouses')
-                        ? 'warehouses'
-                        : pathname.startsWith('/sales')
-                          ? 'sales'
-                          : pathname.startsWith('/inventory')
-                            ? 'inventory'
-                            : pathname.startsWith('/services')
-                              ? 'services'
-                              : pathname.startsWith('/settings')
-                                ? 'settings'
-                                : 'checkout'
+                : pathname.startsWith('/orders')
+                  ? 'orders'
+                  : pathname.startsWith('/expenses')
+                    ? 'expenses'
+                    : pathname.startsWith('/products')
+                      ? 'products'
+                      : pathname.startsWith('/deliveries')
+                        ? 'deliveries'
+                        : pathname.startsWith('/warehouses')
+                          ? 'warehouses'
+                          : pathname.startsWith('/sales')
+                            ? 'sales'
+                            : pathname.startsWith('/inventory')
+                              ? 'inventory'
+                              : pathname.startsWith('/services')
+                                ? 'services'
+                                : pathname.startsWith('/settings')
+                                  ? 'settings'
+                                  : 'checkout'
   const title =
     activeKey === 'dashboard'
       ? 'Dashboard'
@@ -152,23 +157,25 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
               ? 'Profit reports'
               : activeKey === 'credits'
                 ? 'Customer credit'
-                : activeKey === 'expenses'
-                  ? 'Expenses'
-                  : activeKey === 'products'
-                    ? 'Products'
-                    : activeKey === 'deliveries'
-                      ? 'Supplier deliveries'
-                      : activeKey === 'warehouses'
-                        ? 'Warehouses'
-                        : activeKey === 'sales'
-                          ? 'Sales'
-                          : activeKey === 'inventory'
-                            ? 'Inventory'
-                            : activeKey === 'services'
-                              ? 'Service jobs'
-                              : activeKey === 'settings'
-                                ? 'Settings'
-                                : 'Checkout'
+                : activeKey === 'orders'
+                  ? 'Customer orders'
+                  : activeKey === 'expenses'
+                    ? 'Expenses'
+                    : activeKey === 'products'
+                      ? 'Products'
+                      : activeKey === 'deliveries'
+                        ? 'Supplier deliveries'
+                        : activeKey === 'warehouses'
+                          ? 'Warehouses'
+                          : activeKey === 'sales'
+                            ? 'Sales'
+                            : activeKey === 'inventory'
+                              ? 'Inventory'
+                              : activeKey === 'services'
+                                ? 'Service jobs'
+                                : activeKey === 'settings'
+                                  ? 'Settings'
+                                  : 'Checkout'
   const menuItems = [
     { key: 'dashboard', icon: <PieChartOutlined />, label: 'Dashboard' },
     ...(retailEnabled
@@ -182,13 +189,31 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
               { key: 'shifts', icon: <DollarOutlined />, label: 'Cash shifts' },
               { key: 'sales', icon: <BarChartOutlined />, label: 'Sales' },
               ...(role !== 'cashier'
-                ? [{ key: 'credits', icon: <WalletOutlined />, label: 'Customer credit' }]
+                ? [
+                    { key: 'credits', icon: <WalletOutlined />, label: 'Customer credit' },
+                    { key: 'orders', icon: <ShoppingCartOutlined />, label: 'Customer orders' },
+                  ]
                 : []),
             ],
           },
         ]
       : []),
-    ...(servicesEnabled ? [{ key: 'services', icon: <ToolOutlined />, label: 'Services' }] : []),
+    ...(servicesEnabled
+      ? [
+          { key: 'services', icon: <ToolOutlined />, label: 'Services' },
+          ...(!retailEnabled
+            ? [
+                { key: 'checkout', icon: <ShoppingCartOutlined />, label: 'Order checkout' },
+                ...(role !== 'cashier'
+                  ? [{ key: 'orders', icon: <ShoppingCartOutlined />, label: 'Customer orders' }]
+                  : []),
+                ...(role !== 'cashier'
+                  ? [{ key: 'products', icon: <AppstoreOutlined />, label: 'Order catalogue' }]
+                  : []),
+              ]
+            : []),
+        ]
+      : []),
     ...(retailEnabled && role !== 'cashier'
       ? [
           {
@@ -271,7 +296,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
     ...(retailEnabled
       ? [{ key: 'cart', label: 'Cart', icon: <ShoppingCartOutlined />, badge: cartItemCount }]
       : []),
-    ...(servicesEnabled ? [{ key: 'services', label: 'Projects', icon: <ToolOutlined /> }] : []),
+    ...(servicesEnabled ? [{ key: 'services', label: 'Contracts', icon: <ToolOutlined /> }] : []),
     ...(retailEnabled
       ? [{ key: 'sales', label: 'Sales', icon: <BarChartOutlined /> }]
       : !servicesEnabled || role === 'cashier'
@@ -296,7 +321,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
               <img src={tenantBrand.logoUrl} alt="" className="h-8 w-8 shrink-0 object-contain" />
             ) : (
               <span className="grid h-8 w-8 shrink-0 place-items-center bg-[#0B1121] text-xs font-bold text-white">
-                {tenantBrand.name.slice(0, 1).toUpperCase()}
+                {initials(tenantBrand.name)}
               </span>
             )}
             <Text className="brand-wordmark truncate font-bold">{tenantBrand.name}</Text>
@@ -351,7 +376,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Tag
-                color={syncError ? 'error' : supabaseConfigured ? 'green' : 'gold'}
+                color={syncError ? 'error' : supabaseConfigured ? 'success' : 'warning'}
                 className="!m-0 flex !h-9 items-center rounded-full !border-0 !px-2.5 !text-xs !font-medium shadow-sm"
               >
                 <CloudSyncOutlined />{' '}
@@ -421,12 +446,27 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
             <div className="flex flex-wrap items-center gap-3 bg-red-50 px-4 py-2 text-sm text-red-700 md:px-8">
               <span>Sync needs attention: {syncError}</span>
               {onRetrySync && (
-                <Button size="small" type="primary" onClick={onRetrySync}>
+                <Button
+                  size="small"
+                  type="primary"
+                  loading={retryingSync}
+                  onClick={() => {
+                    setRetryingSync(true)
+                    void onRetrySync().finally(() => setRetryingSync(false))
+                  }}
+                >
                   Retry sync
                 </Button>
               )}
               {onReloadCatalogue && (
-                <Button size="small" onClick={onReloadCatalogue}>
+                <Button
+                  size="small"
+                  loading={reloadingCatalogue}
+                  onClick={() => {
+                    setReloadingCatalogue(true)
+                    void onReloadCatalogue().finally(() => setReloadingCatalogue(false))
+                  }}
+                >
                   Reload catalogue
                 </Button>
               )}

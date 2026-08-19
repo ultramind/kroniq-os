@@ -2,6 +2,8 @@ import { Button, Card, Form, Input, Radio, Select, Typography, message } from 'a
 import { useState } from 'react'
 import { supabase } from '../../supabase'
 import { functionErrorMessage } from '../../lib/functionError'
+import { clearLocalPosDataForNewTenant } from '../../db'
+import { clearOfflineWorkspace } from '../../lib/offlineWorkspace'
 
 type Values = {
   companyName: string
@@ -24,6 +26,10 @@ export function OrganizationOnboarding({ onComplete }: { onComplete: () => void 
       api.error(await functionErrorMessage(error, 'Could not create the company workspace.'))
       return
     }
+    // A replacement company must never inherit offline sales, reports, or
+    // catalogue records from a deleted workspace on this device.
+    await clearLocalPosDataForNewTenant()
+    clearOfflineWorkspace()
     api.success('Your company is ready.')
     onComplete()
   }

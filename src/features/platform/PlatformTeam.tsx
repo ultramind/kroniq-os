@@ -20,6 +20,7 @@ export function PlatformTeamPage({ currentRole }: { currentRole: PlatformRole })
   const [api, holder] = message.useMessage()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [updatingMemberId, setUpdatingMemberId] = useState<string>()
   const [form] = Form.useForm<{ email: string; password: string; role: PlatformRole }>()
   const load = useCallback(async () => {
     if (!supabase) return
@@ -34,14 +35,19 @@ export function PlatformTeamPage({ currentRole }: { currentRole: PlatformRole })
   }, [load])
   const updateRole = async (member: Member, role: PlatformRole) => {
     if (!supabase || role === member.platform_role) return
-    const { error } = await supabase.rpc('set_platform_admin_role', {
-      p_user_id: member.user_id,
-      p_platform_role: role,
-    })
-    if (error) api.error(error.message)
-    else {
-      api.success('Platform role updated and audited.')
-      void load()
+    setUpdatingMemberId(member.user_id)
+    try {
+      const { error } = await supabase.rpc('set_platform_admin_role', {
+        p_user_id: member.user_id,
+        p_platform_role: role,
+      })
+      if (error) api.error(error.message)
+      else {
+        api.success('Platform role updated and audited.')
+        await load()
+      }
+    } finally {
+      setUpdatingMemberId(undefined)
     }
   }
   const addMember = async (values: { email: string; password: string; role: PlatformRole }) => {
@@ -67,6 +73,8 @@ export function PlatformTeamPage({ currentRole }: { currentRole: PlatformRole })
         currentRole === 'owner' ? (
           <Select
             value={member.platform_role}
+            loading={updatingMemberId === member.user_id}
+            disabled={Boolean(updatingMemberId)}
             onChange={(role) => void updateRole(member, role)}
             options={(Object.keys(descriptions) as PlatformRole[]).map((role) => ({
               value: role,

@@ -59,6 +59,8 @@ export function StorefrontContentManager() {
   const [sectionOpen, setSectionOpen] = useState(false)
   const [testimonialOpen, setTestimonialOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deletingKey, setDeletingKey] = useState<string>()
   const [sectionForm] = Form.useForm<SectionValues>()
   const [testimonialForm] = Form.useForm<TestimonialValues>()
   const load = useCallback(async () => {
@@ -95,37 +97,53 @@ export function StorefrontContentManager() {
   }, [load])
   const saveSection = async (values: SectionValues) => {
     if (!supabase || !storeId) return
-    const payload = { ...values, store_id: storeId, position: Number(values.position ?? 0) }
-    const { error } = editingSection
-      ? await supabase.from('storefront_sections').update(payload).eq('id', editingSection.id)
-      : await supabase.from('storefront_sections').insert(payload)
-    if (error) api.error(error.message)
-    else {
-      api.success('Homepage section saved.')
-      setSectionOpen(false)
-      await load()
+    setSaving(true)
+    try {
+      const payload = { ...values, store_id: storeId, position: Number(values.position ?? 0) }
+      const { error } = editingSection
+        ? await supabase.from('storefront_sections').update(payload).eq('id', editingSection.id)
+        : await supabase.from('storefront_sections').insert(payload)
+      if (error) api.error(error.message)
+      else {
+        api.success('Homepage section saved.')
+        setSectionOpen(false)
+        await load()
+      }
+    } finally {
+      setSaving(false)
     }
   }
   const saveTestimonial = async (values: TestimonialValues) => {
     if (!supabase || !storeId) return
-    const payload = { ...values, store_id: storeId, position: Number(values.position ?? 0) }
-    const { error } = editingTestimonial
-      ? await supabase.from('storefront_testimonials').update(payload).eq('id', editingTestimonial.id)
-      : await supabase.from('storefront_testimonials').insert(payload)
-    if (error) api.error(error.message)
-    else {
-      api.success('Testimonial saved.')
-      setTestimonialOpen(false)
-      await load()
+    setSaving(true)
+    try {
+      const payload = { ...values, store_id: storeId, position: Number(values.position ?? 0) }
+      const { error } = editingTestimonial
+        ? await supabase.from('storefront_testimonials').update(payload).eq('id', editingTestimonial.id)
+        : await supabase.from('storefront_testimonials').insert(payload)
+      if (error) api.error(error.message)
+      else {
+        api.success('Testimonial saved.')
+        setTestimonialOpen(false)
+        await load()
+      }
+    } finally {
+      setSaving(false)
     }
   }
   const remove = async (table: 'storefront_sections' | 'storefront_testimonials', id: string) => {
     if (!supabase) return
-    const { error } = await supabase.from(table).delete().eq('id', id)
-    if (error) api.error(error.message)
-    else {
-      api.success('Deleted.')
-      await load()
+    const key = `${table}:${id}`
+    setDeletingKey(key)
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id)
+      if (error) api.error(error.message)
+      else {
+        api.success('Deleted.')
+        await load()
+      }
+    } finally {
+      setDeletingKey(undefined)
     }
   }
   const uploadVisual = async (
@@ -200,6 +218,8 @@ export function StorefrontContentManager() {
                     key="delete"
                     danger
                     icon={<DeleteOutlined />}
+                    loading={deletingKey === `storefront_sections:${section.id}`}
+                    disabled={Boolean(deletingKey)}
                     onClick={() => void remove('storefront_sections', section.id)}
                   >
                     Delete
@@ -263,6 +283,8 @@ export function StorefrontContentManager() {
                     key="delete"
                     danger
                     icon={<DeleteOutlined />}
+                    loading={deletingKey === `storefront_testimonials:${item.id}`}
+                    disabled={Boolean(deletingKey)}
                     onClick={() => void remove('storefront_testimonials', item.id)}
                   >
                     Delete
@@ -272,7 +294,7 @@ export function StorefrontContentManager() {
                 <List.Item.Meta
                   title={
                     <>
-                      {item.customer_name} {item.verified && <Tag color="green">Verified customer</Tag>}{' '}
+                      {item.customer_name} {item.verified && <Tag color="success">Verified customer</Tag>}{' '}
                       {!item.published && <Tag>Draft</Tag>}
                     </>
                   }
@@ -296,6 +318,8 @@ export function StorefrontContentManager() {
         onCancel={() => setSectionOpen(false)}
         onOk={() => void sectionForm.submit()}
         okText="Save section"
+        confirmLoading={saving}
+        cancelButtonProps={{ disabled: saving }}
       >
         <Form form={sectionForm} layout="vertical" onFinish={(values) => void saveSection(values)}>
           <Form.Item name="section_type" label="Section type" rules={[{ required: true }]}>
@@ -334,6 +358,8 @@ export function StorefrontContentManager() {
         onCancel={() => setTestimonialOpen(false)}
         onOk={() => void testimonialForm.submit()}
         okText="Save testimonial"
+        confirmLoading={saving}
+        cancelButtonProps={{ disabled: saving }}
       >
         <Form form={testimonialForm} layout="vertical" onFinish={(values) => void saveTestimonial(values)}>
           <Form.Item name="customer_name" label="Customer name" rules={[{ required: true }]}>

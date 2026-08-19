@@ -132,19 +132,17 @@ Deno.serve(async (request) => {
           throw profileError
         }
       }
-      const { error: membershipError } = await adminClient
-        .from('organization_memberships')
-        .upsert(
-          {
-            organization_id: organizationId,
-            user_id: staffId,
-            role,
-            status: 'active',
-            deactivated_at: null,
-            deactivated_by: null,
-          },
-          { onConflict: 'organization_id,user_id' },
-        )
+      const { error: membershipError } = await adminClient.from('organization_memberships').upsert(
+        {
+          organization_id: organizationId,
+          user_id: staffId,
+          role,
+          status: 'active',
+          deactivated_at: null,
+          deactivated_by: null,
+        },
+        { onConflict: 'organization_id,user_id' },
+      )
       if (membershipError) throw membershipError
       return json(
         {

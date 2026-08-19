@@ -4,12 +4,24 @@
 
 html {
   background: #fafafa;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  touch-action: manipulation;
 }
 body {
   margin: 0;
   min-width: 320px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
   background: #fafafa;
   color: #18181b;
+}
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 * {
   -webkit-tap-highlight-color: transparent;
@@ -195,6 +207,10 @@ html:has([data-theme='dark']),
 .ant-picker {
   box-shadow: none !important;
 }
+.credit-search .ant-input-group-addon .ant-btn {
+  height: 40px !important;
+  min-width: 40px;
+}
 .ant-form-item .ant-form-item-extra,
 .ant-form-item .ant-form-item-extra * {
   margin-top: 3px;
@@ -213,6 +229,16 @@ html:has([data-theme='dark']),
   margin-bottom: 16px;
 }
 @media (max-width: 639px) {
+  /* iOS zooms the entire page when a form control uses a font below 16px. */
+  .ant-input,
+  .ant-input-affix-wrapper input,
+  .ant-input-number-input,
+  .ant-picker-input input,
+  .ant-select-selection-search-input,
+  .ant-select-selection-item,
+  textarea.ant-input {
+    font-size: 16px !important;
+  }
   .add-product-form .ant-form-item {
     margin-bottom: 10px;
   }
@@ -246,6 +272,12 @@ html:has([data-theme='dark']),
 }
 .ant-modal-header {
   border-radius: 6px 6px 0 0 !important;
+}
+@media (min-width: 768px) {
+  /* Keep everyday confirmations/forms compact; data-heavy modals opt into wide-modal. */
+  .ant-modal:not(.wide-modal):not(.add-product-modal) {
+    width: min(480px, calc(100vw - 48px)) !important;
+  }
 }
 .ant-tag {
   border-radius: 999px;

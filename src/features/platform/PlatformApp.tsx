@@ -810,6 +810,7 @@ function PlansPage({
         open={Boolean(editing)}
         title={`Edit ${editing?.name ?? ''} plan`}
         width={720}
+        className="wide-modal"
         okText="Save plan"
         confirmLoading={saving}
         onCancel={() => setEditing(undefined)}

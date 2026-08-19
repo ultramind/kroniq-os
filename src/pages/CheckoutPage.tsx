@@ -25,6 +25,7 @@ type Props = {
   discountPercent?: number
   onDiscountChange?: (value: number) => void
   paymentMethod: PaymentMethod
+  orderOnly?: boolean
   onSearchChange: (value: string) => void
   onBarcodeLookup: (code: string) => Product | undefined
   onQuantityChange: (id: string, quantity: number) => void
@@ -47,6 +48,7 @@ export function CheckoutPage({
   discountPercent = 0,
   onDiscountChange = () => undefined,
   paymentMethod,
+  orderOnly = false,
   onSearchChange,
   onBarcodeLookup,
   onQuantityChange,
@@ -126,19 +128,20 @@ export function CheckoutPage({
     const normalized = code.trim()
     if (!normalized) return
     const product = findExactBarcodeProduct(normalized) ?? onBarcodeLookup(normalized)
-    if (product) {
+    if (product && (orderOnly || product.stock > 0)) {
       onSearchChange(normalized)
-      setQuantityProduct(product)
+      setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product)
     }
   }
   const handleSearchChange = (value: string) => {
     onSearchChange(value)
     const product = findExactBarcodeProduct(value)
-    if (product && product.stock > 0) setQuantityProduct(product)
+    if (product && (orderOnly || product.stock > 0))
+      setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product)
   }
   const columns: TableColumnsType<Product> = [
     {
-      title: 'Product',
+      title: orderOnly ? 'Offering' : 'Product',
       key: 'product',
       render: (_, product) => (
         <div className="min-w-[180px]">
@@ -146,7 +149,7 @@ export function CheckoutPage({
             {product.name}
           </Typography.Text>
           <Typography.Text type="secondary" className="text-xs">
-            SKU {product.sku}
+            {orderOnly ? product.description || 'Made-to-order catalogue item' : `SKU ${product.sku}`}
           </Typography.Text>
         </div>
       ),
@@ -174,7 +177,7 @@ export function CheckoutPage({
       dataIndex: 'stock',
       key: 'stock',
       align: 'center',
-      responsive: ['sm'],
+      responsive: orderOnly ? ['xxl'] : ['sm'],
       render: (stock: number) => (
         <span className={stock < 10 ? 'font-semibold text-red-600' : 'text-slate-600'}>{stock}</span>
       ),
@@ -197,7 +200,9 @@ export function CheckoutPage({
       historicalSaving={historicalSaving}
       checkoutSaving={checkoutSaving}
       onHold={hold}
+      onClearCart={state.clearCart}
       onOpenCustomerDisplay={openCustomerDisplay}
+      orderOnly={orderOnly}
     >
       <HeldSales
         sales={heldSales}
@@ -241,7 +246,9 @@ export function CheckoutPage({
                 value={search}
                 onChange={(event) => handleSearchChange(event.target.value)}
                 onPressEnter={() => openScannedProduct(search)}
-                placeholder="Search name, SKU, or scan barcode"
+                placeholder={
+                  orderOnly ? 'Search your made-to-order offerings' : 'Search name, SKU, or scan barcode'
+                }
                 allowClear
                 className="checkout-product-search w-full sm:flex-1"
               />
@@ -279,10 +286,10 @@ export function CheckoutPage({
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
               <Typography.Text type="secondary" className="text-xs">
-                {products.length} products available
+                {products.length} {orderOnly ? 'offerings' : 'products'} available
               </Typography.Text>
               <Typography.Text type="secondary" className="hidden text-xs sm:inline">
-                Tap a product to choose quantity
+                Tap an item to choose quantity and agreed price
               </Typography.Text>
             </div>
           </div>
@@ -303,27 +310,29 @@ export function CheckoutPage({
               }}
               scroll={{ x: 540 }}
               rowClassName={(product) =>
-                product.stock > 0
+                orderOnly || product.stock > 0
                   ? 'checkout-product-row cursor-pointer'
                   : 'checkout-product-row cursor-not-allowed opacity-55'
               }
               onRow={(product) =>
-                product.stock > 0
+                orderOnly || product.stock > 0
                   ? {
-                      onClick: () => setQuantityProduct(product),
+                      onClick: () => setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product),
                       onKeyDown: (event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
-                          setQuantityProduct(product)
+                          setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product)
                         }
                       },
                       tabIndex: 0,
                       role: 'button',
-                      'aria-label': `Add ${product.name} to the current sale`,
+                      'aria-label': `Add ${product.name} to the current ${orderOnly ? 'order' : 'sale'}`,
                     }
                   : { 'aria-label': `${product.name} is out of stock` }
               }
-              locale={{ emptyText: 'No products match your search.' }}
+              locale={{
+                emptyText: orderOnly ? 'No offerings match your search.' : 'No products match your search.',
+              }}
               className="checkout-product-table"
             />
           </div>
@@ -378,6 +387,7 @@ export function CheckoutPage({
               : quantityProduct
             state.addToCartQuantity(item, quantity, agreedPrice, reason)
           }
+          onSearchChange('')
           window.setTimeout(() => searchInputRef.current?.focus(), 100)
         }}
       />

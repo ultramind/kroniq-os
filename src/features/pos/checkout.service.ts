@@ -1,5 +1,5 @@
 import { db } from '../../db'
-import type { CartItem, PaymentMethod } from '../../types'
+import type { CartItem, PaymentMethod, Sale } from '../../types'
 
 export type CreditDetails = {
   customerName: string
@@ -16,7 +16,7 @@ export async function saveOfflineSale(
 ) {
   const id = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  const sale = {
+  const sale: Sale = {
     id,
     receiptNo: `POS-${Date.now().toString().slice(-6)}`,
     total,
@@ -26,6 +26,7 @@ export async function saveOfflineSale(
     synced: false,
     discount,
     status: 'completed' as const,
+    orderStatus: paymentMethod === 'order' ? 'pending' : undefined,
     creditCustomerName: credit?.customerName,
     creditCustomerPhone: credit?.customerPhone,
     creditDueDate: credit?.dueDate,
@@ -49,19 +50,21 @@ export async function saveOfflineSale(
         unitsPerPackage: item.unitsPerPackage,
       })),
     )
-    for (const item of cart) {
-      const productId = item.sourceProductId ?? item.id
-      const stockUnits = item.quantity * (item.unitsPerPackage ?? 1)
-      const currentProduct = await db.products.get(productId)
-      await db.products.update(productId, { stock: Math.max(0, (currentProduct?.stock ?? 0) - stockUnits) })
-      await db.stockMovements.add({
-        id: crypto.randomUUID(),
-        productId,
-        quantityDelta: -stockUnits,
-        reason: 'sale',
-        createdAt,
-        synced: false,
-      })
+    if (paymentMethod !== 'order') {
+      for (const item of cart) {
+        const productId = item.sourceProductId ?? item.id
+        const stockUnits = item.quantity * (item.unitsPerPackage ?? 1)
+        const currentProduct = await db.products.get(productId)
+        await db.products.update(productId, { stock: Math.max(0, (currentProduct?.stock ?? 0) - stockUnits) })
+        await db.stockMovements.add({
+          id: crypto.randomUUID(),
+          productId,
+          quantityDelta: -stockUnits,
+          reason: 'sale',
+          createdAt,
+          synced: false,
+        })
+      }
     }
     await db.outbox.add({ entity: 'sale', action: 'create', payload: { sale, items: cart }, createdAt })
   })

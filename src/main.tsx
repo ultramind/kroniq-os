@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { ConfigProvider } from 'antd'
 import { AuthGate } from './features/auth/AuthGate'
 import { ThemeProvider } from './app/theme'
 import './styles.css'
@@ -9,7 +10,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <AuthGate />
+        <ConfigProvider modal={{ mask: { closable: false } }}>
+          <AuthGate />
+        </ConfigProvider>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,

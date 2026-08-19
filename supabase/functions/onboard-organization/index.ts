@@ -101,8 +101,14 @@ Deno.serve(async (request) => {
     } = await userClient.auth.getUser()
     if (authError || !user) return json({ error: 'Unauthenticated' }, 401)
 
-    const { data: existing } = await adminClient.from('profiles').select('id').eq('id', user.id).maybeSingle()
-    if (existing) return json({ error: 'This account has already completed onboarding.' }, 409)
+    const { data: activeMemberships, error: membershipError } = await adminClient
+      .from('organization_memberships')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+    if (membershipError) throw membershipError
+    if (activeMemberships?.length)
+      return json({ error: 'This account already has an active company workspace.' }, 409)
 
     const {
       companyName,
@@ -143,21 +149,25 @@ Deno.serve(async (request) => {
       throw storeError ?? new Error('Could not create first branch')
     }
 
-    const [{ error: subscriptionError }, { error: profileError }] = await Promise.all([
-      adminClient.from('organization_subscriptions').insert({
-        organization_id: organization.id,
-        plan_code: 'starter',
-        status: 'trial',
-        trial_started_at: new Date().toISOString(),
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      }),
-      adminClient
-        .from('profiles')
-        .insert({ id: user.id, store_id: store.id, full_name: fullName.trim(), role: 'admin' }),
-    ])
-    if (subscriptionError || profileError) {
+    const [{ error: subscriptionError }, { error: profileError }, { error: membershipInsertError }] =
+      await Promise.all([
+        adminClient.from('organization_subscriptions').insert({
+          organization_id: organization.id,
+          plan_code: 'starter',
+          status: 'trial',
+          trial_started_at: new Date().toISOString(),
+          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+        adminClient
+          .from('profiles')
+          .upsert({ id: user.id, store_id: store.id, full_name: fullName.trim(), role: 'admin' }),
+        adminClient
+          .from('organization_memberships')
+          .upsert({ organization_id: organization.id, user_id: user.id, role: 'admin', status: 'active' }),
+      ])
+    if (subscriptionError || profileError || membershipInsertError) {
       await adminClient.from('organizations').delete().eq('id', organization.id)
-      throw subscriptionError ?? profileError
+      throw subscriptionError ?? profileError ?? membershipInsertError
     }
     return json({ organizationId: organization.id, storeId: store.id, role: 'admin' }, 201)
   } catch (error) {

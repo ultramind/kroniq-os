@@ -18,7 +18,7 @@ export interface CashShift {
   varianceReason?: string
   synced?: boolean
 }
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'credit'
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'credit' | 'order'
 
 export interface ProductPackage {
   id: string
@@ -88,6 +88,9 @@ export interface Sale {
   creditDueDate?: string
   creditInitialPayment?: number
   creditSettledAt?: string
+  orderStatus?: 'pending' | 'in_progress' | 'ready' | 'fulfilled' | 'cancelled'
+  orderNotes?: string
+  orderCost?: number
 }
 export interface SaleItem {
   id: string
@@ -145,6 +148,7 @@ export interface CreditPayment {
   amount: number
   paidAt: string
   createdAt: string
+  staffName?: string
 }
 export interface Expense {
   id: string

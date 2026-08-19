@@ -15,7 +15,7 @@ type Payment = { amount_kobo: number }
 type Expense = { amount_kobo: number }
 const meta = (project: Project) =>
   project.status === 'completed'
-    ? { label: 'Completed', color: 'green' }
+    ? { label: 'Completed', color: 'success' }
     : project.status === 'cancelled'
       ? { label: 'Cancelled', color: 'default' }
       : project.due_at && new Date(project.due_at).getTime() < Date.now()
@@ -122,16 +122,16 @@ export function ServiceDashboard({ start, end }: { start: string; end: string })
       <div>
         <h3 className="mb-1 text-lg font-semibold text-slate-900">Service performance</h3>
         <p className="mb-0 text-sm text-slate-500">
-          Projects, collections, balances, and costs for the selected period.
+          Contracts, collections, balances, and costs for the selected period.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <Statistic title="Ongoing projects" value={totals.active} />
+          <Statistic title="Ongoing contracts" value={totals.active} />
         </Card>
         <Card>
           <Statistic
-            title="Overdue projects"
+            title="Overdue contracts"
             value={totals.overdue}
             valueStyle={{ color: totals.overdue ? '#dc2626' : undefined }}
           />
@@ -145,7 +145,7 @@ export function ServiceDashboard({ start, end }: { start: string; end: string })
         </Card>
         <Card>
           <Statistic
-            title="Project expenses"
+            title="Contract expenses"
             value={totals.expenses / 100}
             formatter={(value) => formatNaira(Number(value))}
           />
@@ -179,14 +179,14 @@ export function ServiceDashboard({ start, end }: { start: string; end: string })
           />
         </Card>
       </div>
-      <Card title="Project status">
+      <Card title="Contract status">
         <Table
           rowKey="id"
           size="small"
           pagination={{ pageSize: 5 }}
           dataSource={projects}
           columns={[
-            { title: 'Project', dataIndex: 'title' },
+            { title: 'Contract', dataIndex: 'title' },
             {
               title: 'Contract value',
               dataIndex: 'quoted_amount_kobo',
@@ -211,7 +211,7 @@ export function ServiceDashboard({ start, end }: { start: string; end: string })
               },
             },
           ]}
-          locale={{ emptyText: 'No service projects yet.' }}
+          locale={{ emptyText: 'No service contracts yet.' }}
         />
       </Card>
     </section>

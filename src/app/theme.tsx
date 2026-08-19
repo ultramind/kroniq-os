@@ -9,7 +9,13 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 const sharedTokens = {
   colorPrimary: '#0B1121',
   colorInfo: '#0B1121',
-  colorSuccess: '#16a34a',
+  // Shared with the Offline-first status indicator across the product.
+  colorSuccess: '#15803d',
+  colorSuccessBg: '#f0fdf4',
+  colorSuccessBorder: '#bbf7d0',
+  colorWarning: '#d97706',
+  colorWarningBg: '#fffbeb',
+  colorWarningBorder: '#fde68a',
   borderRadius: 4,
   fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 }

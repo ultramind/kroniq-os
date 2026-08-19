@@ -206,6 +206,7 @@ export function ProductManagement({ products, role, onSave }: Props) {
         okText="Save changes"
         destroyOnClose
         width={780}
+        className="wide-modal"
       >
         <Form form={form} layout="vertical" onFinish={save}>
           <Form.Item name="name" label="Product name" rules={[{ required: true }]}>

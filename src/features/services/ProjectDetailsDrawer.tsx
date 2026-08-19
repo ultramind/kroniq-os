@@ -52,7 +52,7 @@ type Staff = { id: string; full_name: string; role: string }
 type InvoiceBrand = { company_name: string; logo_url?: string | null }
 const statusMeta = (project: Project) =>
   project.status === 'completed'
-    ? { label: 'Completed', color: 'green' }
+    ? { label: 'Completed', color: 'success' }
     : project.status === 'cancelled'
       ? { label: 'Cancelled', color: 'default' }
       : project.due_at && dayjs(project.due_at).endOf('day').isBefore(dayjs())
@@ -207,7 +207,7 @@ export function ProjectDetailsDrawer({
       api.error(error.message)
       return
     }
-    api.success('Project expense recorded.')
+    api.success('Contract expense recorded.')
     setExpenseOpen(false)
     expenseForm.resetFields()
     await load()
@@ -234,7 +234,7 @@ export function ProjectDetailsDrawer({
       api.error(historyError.message)
       return
     }
-    api.success('Project stage updated.')
+    api.success('Contract stage updated.')
     setStageOpen(false)
     stageForm.resetFields()
     await load()
@@ -261,7 +261,7 @@ export function ProjectDetailsDrawer({
       }
     }
     setAssigned(ids)
-    api.success('Project staff updated.')
+    api.success('Contract staff updated.')
   }
   const download = async (document: Document) => {
     if (!supabase) return
@@ -292,7 +292,7 @@ export function ProjectDetailsDrawer({
       : '<tr><td colspan="3" class="muted">No payment recorded yet.</td></tr>'
     const brandHeader = brand.logo_url
       ? `<img class="logo" src="${escape(brand.logo_url)}" alt="${escape(brand.company_name)} logo"/><div class="muted">${escape(brand.company_name)}</div>`
-      : `<div class="brand">${escape(brand.company_name)}</div><div class="muted">Service project invoice</div>`
+      : `<div class="brand">${escape(brand.company_name)}</div><div class="muted">Service contract invoice</div>`
     const popup = window.open('', '_blank', 'width=900,height=720')
     if (!popup) {
       api.error('Your browser blocked the invoice window. Allow pop-ups and try again.')
@@ -300,13 +300,13 @@ export function ProjectDetailsDrawer({
     }
     const issued = dayjs().format('D MMMM YYYY')
     popup.document.write(
-      `<!doctype html><html><head><title>Invoice · ${escape(project.title)}</title><style>body{font-family:Inter,Arial,sans-serif;color:#0B1121;margin:0;padding:48px;background:#fff}.invoice{max-width:760px;margin:auto}.top{display:flex;justify-content:space-between;border-bottom:2px solid #0B1121;padding-bottom:24px}.brand{font-weight:800;font-size:25px;letter-spacing:.02em}.logo{display:block;max-width:170px;max-height:52px;object-fit:contain;object-position:left}.muted{color:#64748b;font-size:13px;line-height:1.6}.title{font-size:34px;margin:32px 0 4px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:32px 0}.label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.value{margin-top:6px;line-height:1.55}.line{width:100%;border-collapse:collapse;margin-top:20px}.line th{background:#f1f5f9;text-align:left;font-size:12px;padding:12px}.line td{padding:12px;border-bottom:1px solid #e2e8f0}.right{text-align:right}.section-title{font-size:15px;margin:34px 0 0}.summary{margin-left:auto;width:320px;margin-top:24px}.summary div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e2e8f0}.summary .due{font-size:18px;font-weight:800;border-bottom:2px solid #0B1121}.footer{margin-top:64px;border-top:1px solid #e2e8f0;padding-top:16px;font-size:12px;color:#64748b}@media print{body{padding:0}.invoice{max-width:none}}</style></head><body><main class="invoice"><div class="top"><div>${brandHeader}</div><div class="muted right"><strong>INVOICE</strong><br/>#${escape(project.id.slice(0, 8).toUpperCase())}<br/>Issued ${issued}</div></div><h1 class="title">${escape(project.title)}</h1><div class="muted">${escape(project.description ?? 'Service project')}</div><section class="meta"><div><div class="label">Bill to</div><div class="value"><strong>${escape(project.customer?.full_name ?? 'Client')}</strong><br/>${escape(project.customer?.phone ?? '')}<br/>${escape(project.customer?.email ?? '')}</div></div><div><div class="label">Project details</div><div class="value">Project date: ${project.project_date ? dayjs(project.project_date).format('D MMM YYYY') : '—'}<br/>Estimated delivery: ${project.due_at ? dayjs(project.due_at).format('D MMM YYYY') : '—'}<br/>Status: ${escape(statusMeta(project).label)}</div></div></section><table class="line"><thead><tr><th>Description</th><th class="right">Amount</th></tr></thead><tbody><tr><td>${escape(project.service?.name ?? project.title)}</td><td class="right">${formatNaira(project.quoted_amount_kobo / 100)}</td></tr></tbody></table><h2 class="section-title">Payment breakdown</h2><table class="line"><thead><tr><th>Date</th><th>Method / reference</th><th class="right">Amount</th></tr></thead><tbody>${paymentRows}</tbody></table><section class="summary"><div><span>Contract value</span><strong>${formatNaira(project.quoted_amount_kobo / 100)}</strong></div><div><span>Amount paid</span><strong>${formatNaira(totalPaid / 100)}</strong></div><div class="due"><span>Balance due</span><span>${formatNaira(balance / 100)}</span></div></section><footer class="footer">Please retain this invoice for your records.</footer></main><script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}</script></body></html>`,
+      `<!doctype html><html><head><title>Invoice · ${escape(project.title)}</title><style>body{font-family:Inter,Arial,sans-serif;color:#0B1121;margin:0;padding:48px;background:#fff}.invoice{max-width:760px;margin:auto}.top{display:flex;justify-content:space-between;border-bottom:2px solid #0B1121;padding-bottom:24px}.brand{font-weight:800;font-size:25px;letter-spacing:.02em}.logo{display:block;max-width:170px;max-height:52px;object-fit:contain;object-position:left}.muted{color:#64748b;font-size:13px;line-height:1.6}.title{font-size:34px;margin:32px 0 4px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:32px 0}.label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.value{margin-top:6px;line-height:1.55}.line{width:100%;border-collapse:collapse;margin-top:20px}.line th{background:#f1f5f9;text-align:left;font-size:12px;padding:12px}.line td{padding:12px;border-bottom:1px solid #e2e8f0}.right{text-align:right}.section-title{font-size:15px;margin:34px 0 0}.summary{margin-left:auto;width:320px;margin-top:24px}.summary div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e2e8f0}.summary .due{font-size:18px;font-weight:800;border-bottom:2px solid #0B1121}.footer{margin-top:64px;border-top:1px solid #e2e8f0;padding-top:16px;font-size:12px;color:#64748b}@media print{body{padding:0}.invoice{max-width:none}}</style></head><body><main class="invoice"><div class="top"><div>${brandHeader}</div><div class="muted right"><strong>INVOICE</strong><br/>#${escape(project.id.slice(0, 8).toUpperCase())}<br/>Issued ${issued}</div></div><h1 class="title">${escape(project.title)}</h1><div class="muted">${escape(project.description ?? 'Service contract')}</div><section class="meta"><div><div class="label">Bill to</div><div class="value"><strong>${escape(project.customer?.full_name ?? 'Client')}</strong><br/>${escape(project.customer?.phone ?? '')}<br/>${escape(project.customer?.email ?? '')}</div></div><div><div class="label">Contract details</div><div class="value">Contract date: ${project.project_date ? dayjs(project.project_date).format('D MMM YYYY') : '—'}<br/>Estimated delivery: ${project.due_at ? dayjs(project.due_at).format('D MMM YYYY') : '—'}<br/>Status: ${escape(statusMeta(project).label)}</div></div></section><table class="line"><thead><tr><th>Description</th><th class="right">Amount</th></tr></thead><tbody><tr><td>${escape(project.service?.name ?? project.title)}</td><td class="right">${formatNaira(project.quoted_amount_kobo / 100)}</td></tr></tbody></table><h2 class="section-title">Payment breakdown</h2><table class="line"><thead><tr><th>Date</th><th>Method / reference</th><th class="right">Amount</th></tr></thead><tbody>${paymentRows}</tbody></table><section class="summary"><div><span>Contract value</span><strong>${formatNaira(project.quoted_amount_kobo / 100)}</strong></div><div><span>Amount paid</span><strong>${formatNaira(totalPaid / 100)}</strong></div><div class="due"><span>Balance due</span><span>${formatNaira(balance / 100)}</span></div></section><footer class="footer">Please retain this invoice for your records.</footer></main><script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}</script></body></html>`,
     )
     popup.document.close()
   }
   return (
     <Drawer
-      title={project?.title ?? 'Project details'}
+      title={project?.title ?? 'Contract details'}
       open={open}
       onClose={onClose}
       width={980}
@@ -359,7 +359,7 @@ export function ProjectDetailsDrawer({
                         {
                           key: 'service',
                           label: 'Service',
-                          children: project.service?.name ?? 'Custom project',
+                          children: project.service?.name ?? 'Custom contract',
                         },
                         {
                           key: 'stage',
@@ -373,7 +373,7 @@ export function ProjectDetailsDrawer({
                         },
                         {
                           key: 'project-date',
-                          label: 'Project date',
+                          label: 'Contract date',
                           children: project.project_date
                             ? dayjs(project.project_date).format('D MMM YYYY')
                             : '—',
@@ -387,7 +387,7 @@ export function ProjectDetailsDrawer({
                           key: 'description',
                           label: 'Description',
                           span: 2,
-                          children: project.description ?? 'No project details added.',
+                          children: project.description ?? 'No contract details added.',
                         },
                       ]}
                     />
@@ -467,7 +467,7 @@ export function ProjectDetailsDrawer({
                       renderItem={(item) => (
                         <List.Item>
                           <List.Item.Meta
-                            title={item.stage?.name ?? 'Project update'}
+                            title={item.stage?.name ?? 'Contract update'}
                             description={`${dayjs(item.created_at).format('D MMM YYYY, h:mm A')}${item.note ? ` · ${item.note}` : ''}`}
                           />
                         </List.Item>
@@ -483,7 +483,7 @@ export function ProjectDetailsDrawer({
                   <>
                     <div className="mb-4 flex items-center justify-between">
                       <Statistic
-                        title="Total project expenses"
+                        title="Total contract expenses"
                         value={totalExpense / 100}
                         formatter={(v) => formatNaira(Number(v))}
                       />
@@ -499,7 +499,7 @@ export function ProjectDetailsDrawer({
                     </div>
                     <List
                       dataSource={expenses}
-                      locale={{ emptyText: 'No project expense has been recorded.' }}
+                      locale={{ emptyText: 'No contract expense has been recorded.' }}
                       renderItem={(expense) => (
                         <List.Item>
                           <List.Item.Meta
@@ -522,7 +522,7 @@ export function ProjectDetailsDrawer({
                     locale={{
                       emptyText: (
                         <Empty
-                          description="No project documents attached."
+                          description="No contract documents attached."
                           image={Empty.PRESENTED_IMAGE_SIMPLE}
                         />
                       ),
@@ -553,7 +553,7 @@ export function ProjectDetailsDrawer({
             ]}
           />
           <Modal
-            title="Record project payment"
+            title="Record contract payment"
             open={paymentOpen}
             onCancel={() => setPaymentOpen(false)}
             onOk={() => void paymentForm.submit()}
@@ -581,7 +581,7 @@ export function ProjectDetailsDrawer({
             </Form>
           </Modal>
           <Modal
-            title="Add project expense"
+            title="Add contract expense"
             open={expenseOpen}
             onCancel={() => setExpenseOpen(false)}
             onOk={() => void expenseForm.submit()}
@@ -601,7 +601,7 @@ export function ProjectDetailsDrawer({
             </Form>
           </Modal>
           <Modal
-            title="Update project stage"
+            title="Update contract stage"
             open={stageOpen}
             onCancel={() => setStageOpen(false)}
             onOk={() => void stageForm.submit()}

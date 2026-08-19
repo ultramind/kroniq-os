@@ -138,7 +138,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
     const resolved = await resolveSaleItems(items)
     if (resolved.error || !resolved.items)
       return { synced, error: resolved.error ?? 'Could not resolve the products for this sale.' }
-    const { error: saleError } = await supabase.rpc('record_sale', {
+    const salePayload = {
       p_sale_id: sale.id,
       p_receipt_no: sale.receiptNo,
       p_total_kobo: Math.round(sale.total * 100),
@@ -153,7 +153,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
         price_override_reason: item.priceOverrideReason ?? null,
       })),
       p_credit:
-        sale.paymentMethod === 'credit'
+        sale.paymentMethod === 'credit' || sale.paymentMethod === 'order'
           ? {
               customer_name: sale.creditCustomerName,
               customer_phone: sale.creditCustomerPhone,
@@ -161,7 +161,11 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
               initial_payment_kobo: Math.round((sale.creditInitialPayment ?? 0) * 100),
             }
           : null,
-    })
+    }
+    const { error: saleError } = await supabase.rpc(
+      sale.paymentMethod === 'order' ? 'record_order' : 'record_sale',
+      salePayload,
+    )
     if (saleError) {
       if (/insufficient stock/i.test(saleError.message)) {
         await db.transaction('rw', db.sales, db.outbox, async () => {
@@ -278,7 +282,7 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
   const { data, error } = await supabase
     .from('sales')
     .select(
-      'id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, products(name))',
+      'id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, order_status, order_notes, order_cost_kobo, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, products(name))',
     )
     .order('sold_at', { ascending: false })
     .limit(500)
@@ -297,6 +301,9 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
         cashier: existing?.cashier ?? `Staff ${row.cashier_id.slice(0, 8)}`,
         synced: true,
         historical: row.is_historical ?? false,
+        orderStatus: row.order_status ?? undefined,
+        orderNotes: row.order_notes ?? undefined,
+        orderCost: row.order_cost_kobo == null ? undefined : row.order_cost_kobo / 100,
         status: row.returned_at ? 'returned' : 'completed',
         returnedAt: row.returned_at ?? undefined,
         creditCustomerName: row.credit_customer_name ?? undefined,

@@ -230,6 +230,7 @@ export function SalesPage({
               { value: 'card', label: 'Card / POS' },
               { value: 'transfer', label: 'Transfer' },
               { value: 'credit', label: 'Credit' },
+              { value: 'order', label: 'Order' },
             ]}
           />
           <Select

@@ -157,7 +157,8 @@ export async function resetLocalPosData() {
 }
 
 export async function clearLocalPosDataForNewTenant() {
-  await db.transaction('rw', [...db.tables], async () => {
-    await Promise.all(db.tables.map((table) => table.clear()))
-  })
+  // A full database reset is intentional at a company boundary. Clearing each
+  // table can leave stale connections alive in installed PWA sessions.
+  await db.delete()
+  await db.open()
 }

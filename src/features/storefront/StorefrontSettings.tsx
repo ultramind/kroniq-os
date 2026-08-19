@@ -330,7 +330,7 @@ export function StorefrontSettings() {
         {!canUseLogo && (
           <Alert
             className="mb-6"
-            type="info"
+            type="warning"
             showIcon
             message="Online storefront is available on Growth"
             description="Starter tenants can prepare content, but need Growth or higher to publish the public shop, use a custom logo, and accept customer visits."
