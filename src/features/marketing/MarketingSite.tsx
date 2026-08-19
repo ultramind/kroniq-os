@@ -82,8 +82,8 @@ const plans = [
     price: 'For getting organised',
     features: [
       'Retail or service operations',
-      'Core POS and inventory',
-      'Expenses, customer credit and reports',
+      'Core POS, inventory and flexible pricing',
+      'Customer orders, expenses, credit and reports',
       'Secure staff roles',
     ],
   },
@@ -93,13 +93,14 @@ const plans = [
     featured: true,
     features: [
       'Everything in Starter',
+      'Packs, warehouses and bulk imports',
       'Online storefront',
       'Logo, brand colour and content',
-      'Product images and expanded limits',
+      'Service contracts and expanded limits',
     ],
   },
   {
-    name: 'Business',
+    name: 'Scale',
     price: 'For larger operations',
     features: [
       'Everything in Growth',
@@ -109,7 +110,7 @@ const plans = [
     ],
   },
   {
-    name: 'Enterprise',
+    name: 'Kroniqos Plus',
     price: 'For tailored operations',
     features: [
       'Custom limits and rollout',
@@ -491,17 +492,27 @@ function PricingPage() {
                 {plan.price}
               </p>
               <div className={`my-6 border-t ${plan.featured ? 'border-slate-700' : 'border-slate-200'}`} />{' '}
-              <ul className="space-y-3">
-                {plan.features.map((feature) => (
-                  <li
-                    key={feature}
-                    className={`flex gap-2 text-sm ${plan.featured ? 'text-slate-200' : 'text-slate-600'}`}
-                  >
-                    <CheckOutlined className="mt-1" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+              <details className="group">
+                <summary
+                  className={`cursor-pointer list-none text-sm font-medium ${plan.featured ? 'text-white' : 'text-[#0B1121]'}`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    Included features ({plan.features.length})
+                    <span className="transition-transform duration-200 group-open:rotate-45">+</span>
+                  </span>
+                </summary>
+                <ul className="mt-4 space-y-3">
+                  {plan.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className={`flex gap-2 text-sm ${plan.featured ? 'text-slate-200' : 'text-slate-600'}`}
+                    >
+                      <CheckOutlined className="mt-1" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </details>
               <Link className="mt-8 block" to="/register">
                 <Button
                   size="large"

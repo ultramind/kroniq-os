@@ -53,27 +53,16 @@ export function StorefrontSettings() {
           .maybeSingle(),
       ])
       if (storeResult.data) {
-        const [organizationResult, subscriptionResult] = await Promise.all([
+        const [organizationResult, brandingEntitlementResult] = await Promise.all([
           supabase
             .from('organizations')
             .select('name')
             .eq('id', storeResult.data.organization_id)
             .maybeSingle(),
-          supabase
-            .from('organization_subscriptions')
-            .select('plan_code,status')
-            .eq('organization_id', storeResult.data.organization_id)
-            .maybeSingle(),
+          supabase.rpc('current_store_has_entitlement', { p_entitlement: 'storefront_branding' }),
         ])
         setStoreName(organizationResult.data?.name ?? '')
-        const subscription = subscriptionResult.data
-        setCanUseLogo(
-          Boolean(
-            subscription &&
-            ['growth', 'business', 'enterprise'].includes(subscription.plan_code) &&
-            ['trial', 'active'].includes(subscription.status),
-          ),
-        )
+        setCanUseLogo(Boolean(brandingEntitlementResult.data))
       }
       if (storefrontResult.data)
         form.setFieldsValue({

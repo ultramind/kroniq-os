@@ -23,6 +23,7 @@ import {
   Avatar,
   Button,
   Card,
+  Collapse,
   Descriptions,
   Empty,
   Form,
@@ -102,6 +103,7 @@ type Plan = {
   monthly_price_kobo: number
   limits: Record<string, number>
   features: string[]
+  entitlements: string[]
   active: boolean
 }
 type OrganizationProfile = Organization & {
@@ -304,6 +306,7 @@ function OrganizationDetail({
   onStoreStatusChange,
   onResendInvite,
   onDeleteOrganization,
+  onRefresh,
   plans,
   updatingId,
 }: PageProps) {
@@ -320,6 +323,9 @@ function OrganizationDetail({
   const [inviteStaffId, setInviteStaffId] = useState<string>()
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [trialModalOpen, setTrialModalOpen] = useState(false)
+  const [trialDays, setTrialDays] = useState(14)
+  const [extendingTrial, setExtendingTrial] = useState(false)
   const [form] = Form.useForm<{
     name: string
     businessEmail?: string
@@ -366,7 +372,12 @@ function OrganizationDetail({
       setDetailLoading(false)
     }
     void loadDetail()
-  }, [organizationId, organizationStores.map((store) => store.id).join(',')])
+  }, [
+    organizationId,
+    organizationStores.map((store) => store.id).join(','),
+    subscription?.status,
+    subscription?.trial_ends_at,
+  ])
 
   if (loading || !organization) return <Skeleton active paragraph={{ rows: 8 }} />
   const owners = profiles.filter((member) => member.role === 'admin')
@@ -391,6 +402,22 @@ function OrganizationDetail({
     await onResendInvite(organization.id, staffId)
     setInviteStaffId(undefined)
   }
+  const extendTrial = async () => {
+    if (!supabase) return
+    setExtendingTrial(true)
+    const { error } = await supabase.rpc('extend_organization_trial', {
+      p_organization_id: organization.id,
+      p_days: trialDays,
+    })
+    setExtendingTrial(false)
+    if (error) {
+      message.error(error.message)
+      return
+    }
+    message.success(`Trial extended by ${trialDays} days.`)
+    setTrialModalOpen(false)
+    onRefresh()
+  }
   const activityTitle = (event: PlatformAudit) =>
     event.action === 'organization_plan_changed'
       ? 'Organisation plan changed'
@@ -400,7 +427,9 @@ function OrganizationDetail({
           ? 'Staff access email resent'
           : event.action === 'organization_profile_updated'
             ? 'Organisation profile updated'
-            : 'Organisation status changed'
+            : event.action === 'organization_trial_extended'
+              ? 'Organisation trial extended'
+              : 'Organisation status changed'
 
   return (
     <>
@@ -521,7 +550,14 @@ function OrganizationDetail({
                 <span className="capitalize">{subscription?.status ?? '—'}</span>
               </Descriptions.Item>
               <Descriptions.Item label="Trial ends">
-                {humanDate(subscription?.trial_ends_at)}
+                <span className="inline-flex items-center gap-2">
+                  {humanDate(subscription?.trial_ends_at)}
+                  {['trial', 'past_due'].includes(subscription?.status ?? '') && (
+                    <Button type="link" size="small" onClick={() => setTrialModalOpen(true)}>
+                      Extend trial
+                    </Button>
+                  )}
+                </span>
               </Descriptions.Item>
               <Descriptions.Item label="Current period ends">
                 {humanDate(subscription?.current_period_ends_at)}
@@ -617,6 +653,27 @@ function OrganizationDetail({
         </Card>
       </div>
       <Modal
+        title="Extend organisation trial"
+        open={trialModalOpen}
+        okText={`Add ${trialDays} days`}
+        confirmLoading={extendingTrial}
+        onCancel={() => setTrialModalOpen(false)}
+        onOk={() => void extendTrial()}
+      >
+        <p className="mb-4 text-xs text-[var(--app-text-muted)]">
+          Extra trial access starts from the later of today or the current trial end date. This action is
+          audited.
+        </p>
+        <InputNumber
+          min={1}
+          max={365}
+          value={trialDays}
+          onChange={(value) => setTrialDays(Number(value ?? 14))}
+          addonAfter="days"
+          className="w-full"
+        />
+      </Modal>
+      <Modal
         title="Edit organisation profile"
         open={profileModalOpen}
         okText="Save profile"
@@ -695,6 +752,7 @@ function PlansPage({
     price: number
     limits: string
     features: string
+    entitlements: string
     active: boolean
   }>()
   const [api, holder] = message.useMessage()
@@ -706,6 +764,7 @@ function PlansPage({
       price: plan.monthly_price_kobo / 100,
       limits: JSON.stringify(plan.limits, null, 2),
       features: plan.features.join('\n'),
+      entitlements: plan.entitlements.join('\n'),
       active: plan.active,
     })
   }
@@ -715,6 +774,7 @@ function PlansPage({
     price: number
     limits: string
     features: string
+    entitlements: string
     active: boolean
   }) => {
     if (!supabase || !editing) return
@@ -739,6 +799,10 @@ function PlansPage({
       p_features: values.features
         .split('\n')
         .map((feature) => feature.trim())
+        .filter(Boolean),
+      p_entitlements: values.entitlements
+        .split('\n')
+        .map((entitlement) => entitlement.trim())
         .filter(Boolean),
       p_active: values.active,
     })
@@ -766,45 +830,65 @@ function PlansPage({
         <Tag color="blue">Server-enforced</Tag>
       </div>
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {plans.map((plan) => (
-          <Card
-            key={plan.code}
-            title={
-              <div className="flex items-center justify-between gap-2">
-                <span>{plan.name}</span>
-                <Button size="small" icon={<EditOutlined />} onClick={() => edit(plan)}>
-                  Edit
-                </Button>
+        {plans.map((plan) => {
+          return (
+            <Card
+              key={plan.code}
+              title={
+                <div className="flex items-center justify-between gap-2">
+                  <span>{plan.name}</span>
+                  <Button size="small" icon={<EditOutlined />} onClick={() => edit(plan)}>
+                    Edit
+                  </Button>
+                </div>
+              }
+            >
+              <Typography.Paragraph type="secondary" className="!min-h-10">
+                {plan.description}
+              </Typography.Paragraph>
+              <Typography.Title level={3} className="!mb-4">
+                {plan.monthly_price_kobo
+                  ? `${formatNaira(plan.monthly_price_kobo / 100)} / month`
+                  : 'Free / custom'}
+              </Typography.Title>
+              <Typography.Text strong>Limits</Typography.Text>
+              <List
+                size="small"
+                dataSource={Object.entries(plan.limits)}
+                renderItem={([key, value]) => (
+                  <List.Item>
+                    {key.replaceAll('_', ' ')}
+                    <Typography.Text strong>{value}</Typography.Text>
+                  </List.Item>
+                )}
+              />
+              <Collapse
+                ghost
+                size="small"
+                className="!mt-3"
+                items={[
+                  {
+                    key: 'features',
+                    label: `Included features (${plan.features.length})`,
+                    children: (
+                      <List
+                        size="small"
+                        dataSource={plan.features}
+                        renderItem={(feature) => <List.Item>✓ {feature}</List.Item>}
+                      />
+                    ),
+                  },
+                ]}
+              />
+              <Typography.Text strong>Server entitlements</Typography.Text>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {plan.entitlements.map((entitlement) => (
+                  <Tag key={entitlement}>{entitlement.replaceAll('_', ' ')}</Tag>
+                ))}
               </div>
-            }
-          >
-            <Typography.Paragraph type="secondary" className="!min-h-10">
-              {plan.description}
-            </Typography.Paragraph>
-            <Typography.Title level={3} className="!mb-4">
-              {plan.monthly_price_kobo
-                ? `${formatNaira(plan.monthly_price_kobo / 100)} / month`
-                : 'Free / custom'}
-            </Typography.Title>
-            <Typography.Text strong>Limits</Typography.Text>
-            <List
-              size="small"
-              dataSource={Object.entries(plan.limits)}
-              renderItem={([key, value]) => (
-                <List.Item>
-                  {key.replaceAll('_', ' ')}
-                  <Typography.Text strong>{value}</Typography.Text>
-                </List.Item>
-              )}
-            />
-            <Typography.Text strong>Included</Typography.Text>
-            <List
-              size="small"
-              dataSource={plan.features}
-              renderItem={(feature) => <List.Item>✓ {feature}</List.Item>}
-            />
-          </Card>
-        ))}
+            </Card>
+          )
+        })}
       </div>
       <Modal
         open={Boolean(editing)}
@@ -837,6 +921,13 @@ function PlansPage({
           </Form.Item>
           <Form.Item name="features" label="Included features" extra="One feature per line.">
             <Input.TextArea rows={7} />
+          </Form.Item>
+          <Form.Item
+            name="entitlements"
+            label="Server entitlements"
+            extra="One key per line. These keys enforce plan access, for example flexible_pricing, orders, packaging, warehouses, online_storefront, and service_contracts."
+          >
+            <Input.TextArea rows={7} className="font-mono text-xs" />
           </Form.Item>
           <Form.Item name="active" label="Available for new subscriptions" valuePropName="checked">
             <Select
@@ -878,7 +969,7 @@ export function PlatformApp() {
       supabase.from('stores').select('id,organization_id,name,status,is_primary,created_at'),
       supabase
         .from('subscription_plans')
-        .select('code,name,description,monthly_price_kobo,limits,features,active')
+        .select('code,name,description,monthly_price_kobo,limits,features,entitlements,active')
         .order('monthly_price_kobo'),
     ])
     let organizationRows = organizationResult.data

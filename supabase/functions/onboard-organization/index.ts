@@ -156,7 +156,7 @@ Deno.serve(async (request) => {
           plan_code: 'starter',
           status: 'trial',
           trial_started_at: new Date().toISOString(),
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
         }),
         adminClient
           .from('profiles')

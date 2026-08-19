@@ -54,18 +54,10 @@ export function SettingsPage({ role }: { role: Role }) {
         .eq('id', store.organization_id)
         .maybeSingle()
       if (organization?.name) form.setFieldValue('storeName', organization.name)
-      const { data: subscription } = await supabase
-        .from('organization_subscriptions')
-        .select('plan_code,status')
-        .eq('organization_id', store.organization_id)
-        .maybeSingle()
-      setCanUseStorefront(
-        Boolean(
-          subscription &&
-          ['growth', 'business', 'enterprise'].includes(subscription.plan_code) &&
-          ['trial', 'active'].includes(subscription.status),
-        ),
-      )
+      const { data: storefrontEntitled } = await supabase.rpc('current_store_has_entitlement', {
+        p_entitlement: 'online_storefront',
+      })
+      setCanUseStorefront(Boolean(storefrontEntitled))
     })()
   }, [form])
   if (role !== 'admin') return <Card>Only administrators can change store settings.</Card>

@@ -51,6 +51,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const cartItemCount = usePosStore((state) => state.cart.reduce((count, item) => count + item.quantity, 0))
   const [collapsed, setCollapsed] = useState(true)
   const [businessModes, setBusinessModes] = useState<string[]>(['retail'])
+  const [serviceContractsEntitled, setServiceContractsEntitled] = useState(false)
   const [userName, setUserName] = useState('Account')
   const [tenantBrand, setTenantBrand] = useState({ name: 'Kroniqos', logoUrl: '' })
   const [cartReceiving, setCartReceiving] = useState(false)
@@ -106,12 +107,16 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
         .eq('id', store.organization_id)
         .maybeSingle()
       if (organization?.business_modes?.length) setBusinessModes(organization.business_modes)
+      const { data: serviceEntitled } = await supabase.rpc('current_store_has_entitlement', {
+        p_entitlement: 'service_contracts',
+      })
+      setServiceContractsEntitled(Boolean(serviceEntitled))
       if (organization?.name && !invoiceBrand?.company_name)
         setTenantBrand((current) => ({ ...current, name: organization.name }))
     })()
   }, [])
   const retailEnabled = businessModes.includes('retail')
-  const servicesEnabled = businessModes.includes('services')
+  const servicesEnabled = businessModes.includes('services') && serviceContractsEntitled
   const activeKey =
     hash === '#audit'
       ? 'audit'

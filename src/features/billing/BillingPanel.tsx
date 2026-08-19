@@ -1,5 +1,17 @@
 import { CreditCardOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Descriptions, Empty, List, Skeleton, Tag, Typography, message } from 'antd'
+import {
+  Alert,
+  Button,
+  Card,
+  Collapse,
+  Descriptions,
+  Empty,
+  List,
+  Skeleton,
+  Tag,
+  Typography,
+  message,
+} from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatNaira } from '../../lib/currency'
 import { supabase } from '../../supabase'
@@ -206,10 +218,23 @@ export function BillingPanel() {
                 <Typography.Text strong>
                   {plan.monthly_price_kobo ? `${formatNaira(plan.monthly_price_kobo / 100)} / month` : 'Free'}
                 </Typography.Text>
-                <List
+                <Collapse
+                  ghost
                   size="small"
-                  dataSource={plan.features.slice(0, 3)}
-                  renderItem={(feature) => <List.Item>✓ {feature}</List.Item>}
+                  className="!my-3"
+                  items={[
+                    {
+                      key: `features-${plan.code}`,
+                      label: `Included features (${plan.features.length})`,
+                      children: (
+                        <List
+                          size="small"
+                          dataSource={plan.features}
+                          renderItem={(feature) => <List.Item>✓ {feature}</List.Item>}
+                        />
+                      ),
+                    },
+                  ]}
                 />
                 <Button
                   type={plan.code === subscription?.plan_code ? 'default' : 'primary'}
