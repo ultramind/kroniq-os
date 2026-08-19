@@ -20,9 +20,9 @@ export async function updateProductDetails(product: Product, details: ProductDet
   if (supabase) {
     if (!navigator.onLine) throw new Error('Product changes require an internet connection.')
     const imageUrls = (details.imageUrls ?? (details.imageUrl ? [details.imageUrl] : [])).slice(0, 2)
-    const { error } = await supabase
-      .from('products')
-      .update({
+    const { error } = await supabase.rpc('update_product_details', {
+      p_product_id: product.id,
+      p_product: {
         name: details.name,
         sku: details.sku,
         price_kobo: Math.round(details.price * 100),
@@ -31,14 +31,11 @@ export async function updateProductDetails(product: Product, details: ProductDet
           details.minimumSellingPrice === undefined ? null : Math.round(details.minimumSellingPrice * 100),
         active: details.active ?? true,
         description: details.description ?? null,
-        image_url: imageUrls[0] ?? null,
         image_urls: imageUrls,
         online_published: details.onlinePublished ?? false,
         is_featured: details.featured ?? false,
-        published_at:
-          details.onlinePublished && !product.onlinePublished ? new Date().toISOString() : undefined,
-      })
-      .eq('id', product.id)
+      },
+    })
     if (error) throw error
   }
   await db.products.update(product.id, details)
