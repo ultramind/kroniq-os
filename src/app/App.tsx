@@ -396,7 +396,7 @@ export function App({
   }
   async function saveProduct(values: ProductFormValues) {
     setSavingProduct(true)
-    const categoryName = values.category[0]?.trim() || 'Uncategorised'
+    const categoryName = values.category[0]?.trim().replace(/\s+/g, ' ') || 'Uncategorised'
     const product: Product = {
       id: crypto.randomUUID(),
       name: values.name,
@@ -424,20 +424,45 @@ export function App({
         setSavingProduct(false)
         return
       }
-      const { data: categoryRows, error: categoryError } = await supabase
+      const { data: existingCategory, error: categoryLookupError } = await supabase
         .from('categories')
-        .upsert({ store_id: profile.store_id, name: categoryName }, { onConflict: 'store_id,name' })
         .select('id')
-      const category = categoryRows?.[0]
-      if (categoryError || !category) {
-        api.error(categoryError?.message ?? 'Could not save product category')
+        .eq('store_id', profile.store_id)
+        .eq('name', categoryName)
+        .maybeSingle()
+      if (categoryLookupError) {
+        api.error(categoryLookupError.message)
         setSavingProduct(false)
         return
+      }
+      let categoryId = existingCategory?.id
+      if (!categoryId) {
+        const { data: createdCategory, error: categoryCreateError } = await supabase
+          .from('categories')
+          .insert({ store_id: profile.store_id, name: categoryName })
+          .select('id')
+          .maybeSingle()
+        if (categoryCreateError || !createdCategory) {
+          // Another manager may have created the same category at the same
+          // time. Read it once more before treating this as a real failure.
+          const { data: concurrentCategory } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('store_id', profile.store_id)
+            .eq('name', categoryName)
+            .maybeSingle()
+          categoryId = concurrentCategory?.id
+          if (!categoryId) {
+            api.error(categoryCreateError?.message ?? 'Could not create product category')
+            setSavingProduct(false)
+            return
+          }
+        } else categoryId = createdCategory.id
       }
       const { error } = await supabase.from('products').insert({
         id: product.id,
         store_id: profile.store_id,
-        category_id: category.id,
+        category_id: categoryId,
         name: product.name,
         sku: product.sku,
         price_kobo: Math.round(product.price * 100),
@@ -591,11 +616,15 @@ export function App({
           <Route path="/settings" element={<SettingsPage role={state.role} />} />
           <Route
             path="/"
-            element={<SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />}
+            element={
+              <SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />
+            }
           />
           <Route
             path="/summary"
-            element={<SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />}
+            element={
+              <SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />
+            }
           />
           <Route path="/services" element={<ServicesPage />} />
           <Route

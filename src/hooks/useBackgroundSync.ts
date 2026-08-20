@@ -27,6 +27,10 @@ export function useBackgroundSync(onSynced: (count: number) => void, onError: (m
         onError(result.error ?? products.error ?? sales.error)
       else onError(undefined)
       if (result.synced) onSynced(result.synced)
+    } catch (error) {
+      onError(
+        error instanceof Error ? error.message : 'Sync paused unexpectedly. It will retry automatically.',
+      )
     } finally {
       runningRef.current = false
     }

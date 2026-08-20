@@ -36,6 +36,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
   const events = await db.outbox.orderBy('createdAt').toArray()
   let synced = 0
   let stockConflicts = 0
+  const failures: string[] = []
   for (const event of events) {
     if (!event.id) continue
     // Conflicting sales are deliberately paused for a manager to resolve. They do
@@ -52,7 +53,10 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
           ? { p_shift: payload }
           : { p_shift_id: payload.shiftId, p_closure: payload },
       )
-      if (error) return { synced, error: `Cash shift sync: ${error.message}` }
+      if (error) {
+        failures.push(`Cash shift sync: ${error.message}`)
+        continue
+      }
       const shiftId = event.entity === 'shift_open' ? String(payload.id) : String(payload.shiftId)
       await db.transaction('rw', db.shifts, db.outbox, async () => {
         await db.shifts.update(shiftId, { synced: true })
@@ -74,14 +78,19 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
           return { product_id: item.productId ?? localItem?.productId, quantity: item.quantity }
         }),
       )
-      if (returnItems.some((item) => !item.product_id))
-        return { synced, error: 'Return sync: product details are unavailable on this device.' }
+      if (returnItems.some((item) => !item.product_id)) {
+        failures.push('Return sync: product details are unavailable on this device.')
+        continue
+      }
       const { error } = await supabase.rpc('return_sale_items', {
         p_sale_id: payload.saleId,
         p_operation_id: payload.operationId,
         p_items: returnItems,
       })
-      if (error) return { synced, error: `Return sync: ${error.message}` }
+      if (error) {
+        failures.push(`Return sync: ${error.message}`)
+        continue
+      }
       await db.transaction('rw', db.sales, db.returnActivities, db.outbox, async () => {
         await db.sales.update(payload.saleId, { synced: true })
         if (payload.activityId) await db.returnActivities.update(payload.activityId, { synced: true })
@@ -98,7 +107,10 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
         p_reason: movement.reason,
         p_operation_id: movement.id,
       })
-      if (error) return { synced, error: `Stock adjustment sync: ${error.message}` }
+      if (error) {
+        failures.push(`Stock adjustment sync: ${error.message}`)
+        continue
+      }
       await db.transaction('rw', db.stockMovements, db.outbox, async () => {
         await db.stockMovements.update(movement.id, { synced: true })
         await db.outbox.delete(event.id!)
@@ -125,7 +137,10 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
           received_at: payload.receivedAt,
         },
       })
-      if (error) return { synced, error: `Supplier delivery sync: ${error.message}` }
+      if (error) {
+        failures.push(`Supplier delivery sync: ${error.message}`)
+        continue
+      }
       await db.transaction('rw', db.stockDeliveries, db.outbox, async () => {
         await db.stockDeliveries.update(payload.id, { synced: true })
         await db.outbox.delete(event.id!)
@@ -136,8 +151,10 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
     if (event.entity !== 'sale') continue
     const { sale, items } = event.payload as { sale: Sale; items: CartItem[] }
     const resolved = await resolveSaleItems(items)
-    if (resolved.error || !resolved.items)
-      return { synced, error: resolved.error ?? 'Could not resolve the products for this sale.' }
+    if (resolved.error || !resolved.items) {
+      failures.push(resolved.error ?? 'Could not resolve the products for this sale.')
+      continue
+    }
     const salePayload = {
       p_sale_id: sale.id,
       p_receipt_no: sale.receiptNo,
@@ -179,14 +196,18 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
         stockConflicts++
         continue
       }
-      return { synced, error: `Sale sync: ${saleError.message}` }
+      failures.push(`Sale sync: ${saleError.message}`)
+      continue
     }
     if (sale.paymentMethod === 'credit' && (sale.creditInitialPayment ?? 0) > 0) {
       const { error: creditError } = await supabase.rpc('record_credit_initial_payment', {
         p_sale_id: sale.id,
         p_initial_payment_kobo: Math.round((sale.creditInitialPayment ?? 0) * 100),
       })
-      if (creditError) return { synced, error: `Credit sync: ${creditError.message}` }
+      if (creditError) {
+        failures.push(`Credit sync: ${creditError.message}`)
+        continue
+      }
     }
     await db.transaction('rw', db.sales, db.outbox, async () => {
       await db.sales.update(sale.id, { synced: true })
@@ -196,9 +217,16 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
   }
   return {
     synced,
-    error: stockConflicts
-      ? `${stockConflicts} sale${stockConflicts === 1 ? '' : 's'} need stock review.`
-      : undefined,
+    error: [
+      stockConflicts
+        ? `${stockConflicts} sale${stockConflicts === 1 ? '' : 's'} need stock review.`
+        : undefined,
+      failures.length
+        ? `${failures.length} queued record${failures.length === 1 ? '' : 's'} will retry automatically. ${failures[0]}`
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join(' '),
   }
 }
 

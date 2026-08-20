@@ -331,13 +331,23 @@ export function AuthGate() {
           })
           return
         }
-        if (data.role === 'cashier' && navigator.onLine) await within(pullProducts(), 'Checkout catalogue')
-        if (redirectToDefault && wasUnauthenticated.current) {
+        // Do not hold the entire signed-in application behind the startup
+        // loader while the cashier catalogue refreshes. IndexedDB supplies the
+        // last known catalogue immediately, and the network refresh updates it
+        // in the background once checkout is already visible.
+        if (data.role === 'cashier' && navigator.onLine) void pullProducts()
+        const shouldRedirectToWorkspace =
+          redirectToDefault || pathname === '/login' || pathname === '/register'
+        setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
+        if (shouldRedirectToWorkspace) {
           wasUnauthenticated.current = false
           message.success('Logged in successfully.')
-          navigateRef.current(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
+          // Wait for React to mount the authenticated app before changing
+          // routes. This avoids a blank checkout shell immediately after login.
+          window.requestAnimationFrame(() =>
+            navigateRef.current(data.role === 'cashier' ? '/checkout' : '/', { replace: true }),
+          )
         }
-        setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
       } catch (error) {
         const {
           data: { session },
@@ -370,10 +380,8 @@ export function AuthGate() {
         // active company. Preserve each scoped offline database, but discard
         // the browser-session preference for the previously opened company.
         const workspace = getStoredOfflineWorkspace()
-        if (workspace?.userId)
-          sessionStorage.removeItem(`kroniq-active-organization:${workspace.userId}`)
-        if (workspace?.userId)
-          sessionStorage.removeItem(`kroniq-workspace-selected:${workspace.userId}`)
+        if (workspace?.userId) sessionStorage.removeItem(`kroniq-active-organization:${workspace.userId}`)
+        if (workspace?.userId) sessionStorage.removeItem(`kroniq-workspace-selected:${workspace.userId}`)
       }
       void load(event === 'SIGNED_IN')
     })

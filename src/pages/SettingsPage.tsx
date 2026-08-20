@@ -17,7 +17,7 @@ import {
 } from '../lib/storeSettings'
 import { supabase } from '../supabase'
 import type { Role } from '../types'
-import { clearLocalPosDataForNewTenant } from '../db'
+import { clearLocalPosDataForNewTenant, db } from '../db'
 import { clearOfflineWorkspace } from '../lib/offlineWorkspace'
 
 type Values = StoreSettings
@@ -159,7 +159,14 @@ export function SettingsPage({ role }: { role: Role }) {
       ]}
     />
   )
-  const clearDeviceWorkspace = () => {
+  const clearDeviceWorkspace = async () => {
+    const pendingRecords = await db.outbox.count()
+    if (pendingRecords) {
+      api.warning(
+        `${pendingRecords} record${pendingRecords === 1 ? '' : 's'} still need sync. Do not clear this device: retry sync or resolve the stock review first.`,
+      )
+      return
+    }
     Modal.confirm({
       title: 'Clear local device records?',
       content:
@@ -208,7 +215,7 @@ export function SettingsPage({ role }: { role: Role }) {
                       Use this after changing or deleting a company to remove old offline records from this
                       device.
                     </p>
-                    <Button danger onClick={clearDeviceWorkspace}>
+                    <Button danger onClick={() => void clearDeviceWorkspace()}>
                       Clear local device records
                     </Button>
                   </div>
