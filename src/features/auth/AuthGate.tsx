@@ -25,6 +25,11 @@ import { initials } from '../../lib/initials'
 import { usePosStore } from '../../store'
 import { clearStoreSettings } from '../../lib/storeSettings'
 import { clearCustomerDisplay } from '../pos/customerDisplay'
+import {
+  restoreCheckoutDraft,
+  saveCheckoutDraft,
+  startCheckoutDraftPersistence,
+} from '../../lib/checkoutDraft'
 
 export function AuthGate() {
   const { mode } = useTheme()
@@ -62,11 +67,35 @@ export function AuthGate() {
   }>({ loading: true })
   const wasUnauthenticated = useRef(false)
   const navigateRef = useRef(navigate)
+  const stopCheckoutDraftPersistence = useRef<(() => void) | undefined>(undefined)
+  const checkoutDraftWorkspace = useRef<{ userId: string; organizationId: string } | undefined>(undefined)
   navigateRef.current = navigate
   function resetTenantUiState() {
+    const workspace = checkoutDraftWorkspace.current
+    if (workspace) {
+      const store = usePosStore.getState()
+      saveCheckoutDraft(workspace.userId, workspace.organizationId, {
+        cart: store.cart,
+        paymentMethod: store.paymentMethod,
+        discountPercent: store.discountPercent,
+      })
+    }
+    stopCheckoutDraftPersistence.current?.()
+    stopCheckoutDraftPersistence.current = undefined
+    checkoutDraftWorkspace.current = undefined
     clearStoreSettings()
     clearCustomerDisplay()
     usePosStore.getState().resetSession()
+  }
+  function restoreCheckoutForWorkspace(userId: string, organizationId: string) {
+    stopCheckoutDraftPersistence.current?.()
+    const draft = restoreCheckoutDraft(userId, organizationId)
+    const store = usePosStore.getState()
+    store.replaceCart(draft?.cart ?? [])
+    store.setPaymentMethod(draft?.paymentMethod ?? 'cash')
+    store.setDiscountPercent(draft?.discountPercent ?? 0)
+    checkoutDraftWorkspace.current = { userId, organizationId }
+    stopCheckoutDraftPersistence.current = startCheckoutDraftPersistence(userId, organizationId)
   }
   async function selectWorkspace(workspace: CompanyWorkspace) {
     if (!supabase) return
@@ -91,6 +120,7 @@ export function AuthGate() {
       resetTenantUiState()
     await selectOfflineDatabase(user.id, workspace.organizationId)
     sessionStorage.setItem(`kroniq-active-organization:${user.id}`, workspace.organizationId)
+    sessionStorage.setItem(`kroniq-workspace-selected:${user.id}`, 'true')
     window.location.reload()
   }
   useEffect(() => {
@@ -153,6 +183,7 @@ export function AuthGate() {
         if (!navigator.onLine) {
           if (cachedWorkspace) {
             await selectOfflineDatabase(session.user.id, cachedWorkspace.organizationId ?? 'default')
+            restoreCheckoutForWorkspace(session.user.id, cachedWorkspace.organizationId ?? 'default')
             if (cachedWorkspace.organizationId)
               await migrateLegacyOfflineDatabase(session.user.id, cachedWorkspace.organizationId)
             setState({
@@ -197,6 +228,14 @@ export function AuthGate() {
           return
         }
         const workspaceKey = `kroniq-active-organization:${session.user.id}`
+        const workspaceChoiceKey = `kroniq-workspace-selected:${session.user.id}`
+        // A company is explicitly selected for each sign-in session. This
+        // prevents a stale browser preference from silently opening the wrong
+        // company when one email belongs to several organisations.
+        if (workspaces.length > 1 && !sessionStorage.getItem(workspaceChoiceKey)) {
+          setState({ loading: false, workspaceChoices: workspaces })
+          return
+        }
         let activeWorkspace = workspaces.find(
           (workspace) => workspace.organizationId === sessionStorage.getItem(workspaceKey),
         )
@@ -221,6 +260,7 @@ export function AuthGate() {
           sessionStorage.setItem(workspaceKey, activeWorkspace.organizationId)
         }
         await selectOfflineDatabase(session.user.id, activeWorkspace.organizationId)
+        restoreCheckoutForWorkspace(session.user.id, activeWorkspace.organizationId)
         if (
           storedWorkspace?.userId === session.user.id &&
           storedWorkspace.organizationId === activeWorkspace.organizationId
@@ -325,6 +365,16 @@ export function AuthGate() {
       // valid, so this must stay in the background instead of remounting the
       // entire workspace behind the startup loader.
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return
+      if (event === 'SIGNED_OUT') {
+        // A new sign-in with the same email must be able to choose another
+        // active company. Preserve each scoped offline database, but discard
+        // the browser-session preference for the previously opened company.
+        const workspace = getStoredOfflineWorkspace()
+        if (workspace?.userId)
+          sessionStorage.removeItem(`kroniq-active-organization:${workspace.userId}`)
+        if (workspace?.userId)
+          sessionStorage.removeItem(`kroniq-workspace-selected:${workspace.userId}`)
+      }
       void load(event === 'SIGNED_IN')
     })
     return () => listener.subscription.unsubscribe()

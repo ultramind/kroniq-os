@@ -957,6 +957,20 @@ export function PlatformApp() {
   const [updatingId, setUpdatingId] = useState<string>()
   const [api, holder] = message.useMessage()
   const onDetailPage = pathname.startsWith('/platform/organisations/')
+  function confirmSignOut() {
+    Modal.confirm({
+      title: 'Sign out of platform control?',
+      content: 'You can sign in again at any time to continue managing Kroniqos organisations.',
+      okText: 'Sign out',
+      cancelText: 'Stay signed in',
+      closable: false,
+      maskClosable: false,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await supabase?.auth.signOut()
+      },
+    })
+  }
 
   const load = useCallback(async () => {
     if (!supabase) return
@@ -1305,7 +1319,7 @@ export function PlatformApp() {
                   aria-label="Sign out"
                   className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !border-slate-200 !text-slate-600"
                   icon={<LogoutOutlined />}
-                  onClick={() => void supabase?.auth.signOut()}
+                  onClick={confirmSignOut}
                 />
               </Tooltip>
             </div>

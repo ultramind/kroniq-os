@@ -23,7 +23,7 @@ import {
   WalletOutlined,
   WifiOutlined,
 } from '@ant-design/icons'
-import { Avatar, Badge, Button, Dropdown, Layout, Menu, Tag, Tooltip, Typography } from 'antd'
+import { Avatar, Badge, Button, Dropdown, Layout, Menu, Modal, Tag, Tooltip, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, supabaseConfigured } from '../supabase'
@@ -58,6 +58,23 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
   const [retryingSync, setRetryingSync] = useState(false)
   const [reloadingCatalogue, setReloadingCatalogue] = useState(false)
   const [online, setOnline] = useState(() => navigator.onLine)
+  function confirmSignOut() {
+    const hasUnfinishedCheckout = cartItemCount > 0
+    Modal.confirm({
+      title: 'Sign out of Kroniqos?',
+      content: hasUnfinishedCheckout
+        ? `You have ${cartItemCount} item${cartItemCount === 1 ? '' : 's'} in an unfinished checkout. It will be saved as a private draft for this company and restored when you sign in again.`
+        : 'You will return to the sign-in page.',
+      okText: 'Sign out',
+      cancelText: 'Stay signed in',
+      closable: false,
+      maskClosable: false,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await supabase?.auth.signOut()
+      },
+    })
+  }
   useEffect(() => {
     const setOnlineStatus = () => setOnline(navigator.onLine)
     window.addEventListener('online', setOnlineStatus)
@@ -426,7 +443,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
                         block
                         className="!mt-1 !flex !h-10 !items-center !justify-start !px-3"
                         icon={<LogoutOutlined />}
-                        onClick={() => void supabase?.auth.signOut()}
+                        onClick={confirmSignOut}
                       >
                         Sign out
                       </Button>
@@ -446,7 +463,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
                     aria-label="Sign out"
                     className="hidden !h-9 !w-9 !items-center !justify-center !rounded-full !border-slate-200 !text-slate-600 hover:!border-red-200 hover:!text-red-600 md:!flex"
                     icon={<LogoutOutlined />}
-                    onClick={() => void supabase?.auth.signOut()}
+                    onClick={confirmSignOut}
                   />
                 </Tooltip>
               )}

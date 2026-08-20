@@ -1,5 +1,5 @@
 import { ApartmentOutlined, ArrowRightOutlined, LogoutOutlined } from '@ant-design/icons'
-import { Button, Card, Tag, Typography } from 'antd'
+import { Button, Card, Popconfirm, Tag, Typography } from 'antd'
 import type { Role } from '../../types'
 
 export type CompanyWorkspace = {
@@ -34,9 +34,16 @@ export function CompanyWorkspacePicker({
               Select the company you want to work in for this sign-in session.
             </Typography.Text>
           </div>
-          <Button icon={<LogoutOutlined />} onClick={onSignOut}>
-            Sign out
-          </Button>
+          <Popconfirm
+            title="Sign out of Kroniqos?"
+            description="You will return to the sign-in page."
+            okText="Sign out"
+            cancelText="Stay signed in"
+            okButtonProps={{ danger: true }}
+            onConfirm={onSignOut}
+          >
+            <Button icon={<LogoutOutlined />}>Sign out</Button>
+          </Popconfirm>
         </div>
         <div className="grid gap-3">
           {companies.map((company) => (
