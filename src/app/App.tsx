@@ -415,38 +415,21 @@ export function App({
           setSavingProduct(false)
           return
         }
-        const { data: profiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('store_id')
-          .limit(1)
-        const profile = profiles?.[0]
-        if (profileError || !profile) {
-          api.error(profileError?.message ?? 'Store profile not found')
-          setSavingProduct(false)
-          return
-        }
-        const { data: categoryId, error: categoryError } = await supabase.rpc(
-          'get_or_create_current_category',
-          {
-            p_name: categoryName,
+        const { error } = await supabase.rpc('create_current_store_product', {
+          p_product: {
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            category_name: categoryName,
+            price_kobo: Math.round(product.price * 100),
+            cost_price_kobo: Math.round(product.costPrice * 100),
+            minimum_selling_price_kobo:
+              product.minimumSellingPrice === undefined
+                ? null
+                : Math.round(product.minimumSellingPrice * 100),
+            stock_quantity: product.stock,
+            low_stock_threshold: product.lowStockThreshold,
           },
-        )
-        if (categoryError || !categoryId) {
-          api.error(categoryError?.message ?? 'Could not create product category')
-          return
-        }
-        const { error } = await supabase.from('products').insert({
-          id: product.id,
-          store_id: profile.store_id,
-          category_id: categoryId,
-          name: product.name,
-          sku: product.sku,
-          price_kobo: Math.round(product.price * 100),
-          cost_price_kobo: Math.round(product.costPrice * 100),
-          minimum_selling_price_kobo:
-            product.minimumSellingPrice === undefined ? null : Math.round(product.minimumSellingPrice * 100),
-          stock_quantity: product.stock,
-          low_stock_threshold: product.lowStockThreshold,
         })
         if (error) {
           api.error(error.message)

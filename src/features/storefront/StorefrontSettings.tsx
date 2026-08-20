@@ -139,35 +139,25 @@ export function StorefrontSettings() {
     if (!supabase) return
     setSaving(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      const { data: profile } = user
-        ? await supabase.from('profiles').select('store_id').eq('id', user.id).maybeSingle()
-        : { data: null }
-      if (!profile) {
-        api.error('Store profile not found.')
-        return
-      }
-      const { error } = await supabase.from('storefronts').upsert({
-        store_id: profile.store_id,
-        slug: values.slug.toLowerCase().trim(),
-        enabled: values.enabled,
-        template_key: values.templateKey ?? 'classic_retail',
-        headline: values.headline,
-        description: values.description,
-        phone: values.phone,
-        whatsapp: values.whatsapp,
-        address: values.address,
-        primary_color: values.primaryColor || '#0B1121',
-        hero_image_urls: (values.heroImageUrls ?? []).slice(0, MAX_HERO_IMAGES),
-        logo_url: values.logoUrl || null,
-        vision: values.vision || null,
-        mission: values.mission || null,
-        trust_stats: (values.trustStats ?? [])
-          .filter((stat) => stat.value?.trim() && stat.label?.trim())
-          .slice(0, 4),
-        updated_at: new Date().toISOString(),
+      const { error } = await supabase.rpc('save_current_storefront', {
+        p_storefront: {
+          slug: values.slug.toLowerCase().trim(),
+          enabled: values.enabled,
+          template_key: values.templateKey ?? 'classic_retail',
+          headline: values.headline,
+          description: values.description,
+          phone: values.phone,
+          whatsapp: values.whatsapp,
+          address: values.address,
+          primary_color: values.primaryColor || '#0B1121',
+          hero_image_urls: (values.heroImageUrls ?? []).slice(0, MAX_HERO_IMAGES),
+          logo_url: values.logoUrl || null,
+          vision: values.vision || null,
+          mission: values.mission || null,
+          trust_stats: (values.trustStats ?? [])
+            .filter((stat) => stat.value?.trim() && stat.label?.trim())
+            .slice(0, 4),
+        },
       })
       if (error) api.error(error.message)
       else api.success(`Storefront saved. Public URL: /shop/${values.slug}`)
