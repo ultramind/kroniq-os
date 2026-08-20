@@ -589,8 +589,14 @@ export function App({
       <div className="mx-auto max-w-7xl">
         <Routes>
           <Route path="/settings" element={<SettingsPage role={state.role} />} />
-          <Route path="/" element={<SummaryPage sales={allSales} />} />
-          <Route path="/summary" element={<SummaryPage sales={allSales} />} />
+          <Route
+            path="/"
+            element={<SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />}
+          />
+          <Route
+            path="/summary"
+            element={<SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />}
+          />
           <Route path="/services" element={<ServicesPage />} />
           <Route
             path="/checkout"

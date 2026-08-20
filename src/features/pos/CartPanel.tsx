@@ -528,7 +528,7 @@ export function CartPanel({
         size="large"
         block
         loading={historicalSaving || checkoutSaving}
-        className="touch-checkout touch-target whitespace-normal px-2 text-base font-bold leading-tight active:scale-[0.98]"
+        className="touch-checkout touch-target whitespace-normal !border-[#15803d] !bg-[#15803d] px-2 text-base font-bold leading-tight hover:!border-[#166534] hover:!bg-[#166534] active:scale-[0.98]"
         disabled={
           !cart.length ||
           cashIsInsufficient ||

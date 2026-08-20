@@ -338,7 +338,14 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
           mode="inline"
           selectedKeys={[activeKey]}
           openKeys={collapsed ? [] : openKeys}
-          onOpenChange={(keys) => setOpenKeys(collapsed ? [] : keys)}
+          onOpenChange={(keys) => {
+            if (collapsed) {
+              setOpenKeys([])
+              return
+            }
+            const newlyOpened = keys.find((key) => !openKeys.includes(key))
+            setOpenKeys(newlyOpened ? [newlyOpened] : [])
+          }}
           className="!border-0 !bg-transparent"
           items={menuItems}
           onClick={({ key }) => {

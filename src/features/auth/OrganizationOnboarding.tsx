@@ -8,7 +8,6 @@ import { clearOfflineWorkspace } from '../../lib/offlineWorkspace'
 type Values = {
   companyName: string
   branchName: string
-  fullName: string
   businessMode: 'retail' | 'services' | 'hybrid'
   currencyCode: string
 }
@@ -80,9 +79,6 @@ export function OrganizationOnboarding({ onComplete }: { onComplete: () => void 
               />
             </Form.Item>
           </div>
-          <Form.Item name="fullName" label="Your full name" rules={[{ required: true }]}>
-            <Input size="large" />
-          </Form.Item>
           <Button type="primary" htmlType="submit" size="large" block loading={saving}>
             Create company workspace
           </Button>

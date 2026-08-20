@@ -8,7 +8,7 @@ import { App } from '../../app/App'
 import { Login } from './Login'
 import { OrganizationOnboarding } from './OrganizationOnboarding'
 import { CompanyRegistration } from './CompanyRegistration'
-import { clearLocalPosDataForNewTenant } from '../../db'
+import { migrateLegacyOfflineDatabase, selectOfflineDatabase } from '../../db'
 import { PlatformAccessDenied, PlatformApp } from '../platform/PlatformApp'
 import { BillingPanel } from '../billing/BillingPanel'
 import { MarketingSite } from '../marketing/MarketingSite'
@@ -16,8 +16,15 @@ import { StorefrontPage } from '../../pages/StorefrontPage'
 import { CompanyWorkspacePicker, type CompanyWorkspace } from './CompanyWorkspacePicker'
 import { useTheme } from '../../app/theme'
 import { pullProducts } from '../../sync'
-import { clearOfflineWorkspace, getOfflineWorkspace, saveOfflineWorkspace } from '../../lib/offlineWorkspace'
+import {
+  getOfflineWorkspace,
+  getStoredOfflineWorkspace,
+  saveOfflineWorkspace,
+} from '../../lib/offlineWorkspace'
 import { initials } from '../../lib/initials'
+import { usePosStore } from '../../store'
+import { clearStoreSettings } from '../../lib/storeSettings'
+import { clearCustomerDisplay } from '../pos/customerDisplay'
 
 export function AuthGate() {
   const { mode } = useTheme()
@@ -54,6 +61,13 @@ export function AuthGate() {
     workspaceError?: string
   }>({ loading: true })
   const wasUnauthenticated = useRef(false)
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  function resetTenantUiState() {
+    clearStoreSettings()
+    clearCustomerDisplay()
+    usePosStore.getState().resetSession()
+  }
   async function selectWorkspace(workspace: CompanyWorkspace) {
     if (!supabase) return
     setState((current) => ({
@@ -74,7 +88,8 @@ export function AuthGate() {
     }
     const cachedWorkspace = getOfflineWorkspace(user.id)
     if (cachedWorkspace?.organizationId && cachedWorkspace.organizationId !== workspace.organizationId)
-      await clearLocalPosDataForNewTenant()
+      resetTenantUiState()
+    await selectOfflineDatabase(user.id, workspace.organizationId)
     sessionStorage.setItem(`kroniq-active-organization:${user.id}`, workspace.organizationId)
     window.location.reload()
   }
@@ -100,14 +115,25 @@ export function AuthGate() {
           ),
         ])
       try {
+        // Never leave the previous tenant UI visible while a new auth session is
+        // being resolved. This also unmounts live Dexie queries immediately.
+        setState({ loading: true })
         const {
           data: { session },
         } = await within(client.auth.getSession(), 'Session check')
         if (!session) {
           wasUnauthenticated.current = true
-          clearOfflineWorkspace()
+          resetTenantUiState()
+          // Keep the cache owner marker until the next successful sign-in. It
+          // lets us reliably identify and erase a different user's local data.
           setState({ loading: false, unauthenticated: true })
           return
+        }
+        const storedWorkspace = getStoredOfflineWorkspace()
+        // A different account must never reuse the prior account's in-memory
+        // state. Its IndexedDB is selected only after its company is known.
+        if (!storedWorkspace || storedWorkspace.userId !== session.user.id) {
+          resetTenantUiState()
         }
         const cachedWorkspace = getOfflineWorkspace(session.user.id)
         if (cachedWorkspace?.tenantName)
@@ -126,6 +152,9 @@ export function AuthGate() {
         }
         if (!navigator.onLine) {
           if (cachedWorkspace) {
+            await selectOfflineDatabase(session.user.id, cachedWorkspace.organizationId ?? 'default')
+            if (cachedWorkspace.organizationId)
+              await migrateLegacyOfflineDatabase(session.user.id, cachedWorkspace.organizationId)
             setState({
               loading: false,
               role: cachedWorkspace.role,
@@ -180,7 +209,7 @@ export function AuthGate() {
           cachedWorkspace?.organizationId &&
           cachedWorkspace.organizationId !== activeWorkspace.organizationId
         )
-          await clearLocalPosDataForNewTenant()
+          resetTenantUiState()
         if (sessionStorage.getItem(workspaceKey) !== activeWorkspace.organizationId) {
           const { error: activationError } = await client.rpc('activate_organization_workspace', {
             p_organization_id: activeWorkspace.organizationId,
@@ -191,6 +220,12 @@ export function AuthGate() {
           }
           sessionStorage.setItem(workspaceKey, activeWorkspace.organizationId)
         }
+        await selectOfflineDatabase(session.user.id, activeWorkspace.organizationId)
+        if (
+          storedWorkspace?.userId === session.user.id &&
+          storedWorkspace.organizationId === activeWorkspace.organizationId
+        )
+          await migrateLegacyOfflineDatabase(session.user.id, activeWorkspace.organizationId)
         const { data, error } = await within(
           client.from('profiles').select('role, full_name, store_id').eq('id', session.user.id).maybeSingle(),
           'Workspace profile check',
@@ -210,7 +245,7 @@ export function AuthGate() {
             })
             return
           }
-          await clearLocalPosDataForNewTenant()
+          resetTenantUiState()
           setState({ loading: false, onboarding: true })
           return
         }
@@ -260,7 +295,7 @@ export function AuthGate() {
         if (redirectToDefault && wasUnauthenticated.current) {
           wasUnauthenticated.current = false
           message.success('Logged in successfully.')
-          navigate(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
+          navigateRef.current(data.role === 'cashier' ? '/checkout' : '/', { replace: true })
         }
         setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
       } catch (error) {
@@ -285,9 +320,15 @@ export function AuthGate() {
       }
     }
     void load()
-    const { data: listener } = client.auth.onAuthStateChange((event) => void load(event === 'SIGNED_IN'))
+    const { data: listener } = client.auth.onAuthStateChange((event) => {
+      // Supabase refreshes tokens when a tab regains focus. The session remains
+      // valid, so this must stay in the background instead of remounting the
+      // entire workspace behind the startup loader.
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return
+      void load(event === 'SIGNED_IN')
+    })
     return () => listener.subscription.unsubscribe()
-  }, [navigate, platformRoute, publicStorefrontRoute])
+  }, [platformRoute, publicStorefrontRoute])
   if (publicStorefrontRoute) return <StorefrontPage />
   if (state.workspaceChoices)
     return (

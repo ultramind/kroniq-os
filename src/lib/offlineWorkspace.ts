@@ -17,9 +17,19 @@ export function saveOfflineWorkspace(workspace: Omit<OfflineWorkspace, 'savedAt'
 }
 
 export function getOfflineWorkspace(userId: string): OfflineWorkspace | undefined {
+  const saved = getStoredOfflineWorkspace()
+  return saved?.userId === userId ? saved : undefined
+}
+
+/**
+ * Returns the device cache owner without granting access to its data. This is
+ * used only to erase a previous tenant's local workspace before another user
+ * can open the app on the same device.
+ */
+export function getStoredOfflineWorkspace(): OfflineWorkspace | undefined {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) ?? '') as OfflineWorkspace
-    return saved.userId === userId ? saved : undefined
+    return saved.userId ? saved : undefined
   } catch {
     return undefined
   }

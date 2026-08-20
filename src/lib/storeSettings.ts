@@ -31,3 +31,7 @@ export function getStoreSettings(): StoreSettings {
 export function saveStoreSettings(settings: StoreSettings) {
   localStorage.setItem(key, JSON.stringify(settings))
 }
+
+export function clearStoreSettings() {
+  localStorage.removeItem(key)
+}

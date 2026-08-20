@@ -16,12 +16,21 @@ import {
   Upload,
   message,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, InboxOutlined, UploadOutlined } from '@ant-design/icons'
+import {
+  BarcodeOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  InboxOutlined,
+  PrinterOutlined,
+  UploadOutlined,
+} from '@ant-design/icons'
+import JsBarcode from 'jsbarcode'
 import { formatNaira } from '../../lib/currency'
 import { supabase } from '../../supabase'
 import type { Product, Role } from '../../types'
 import { ProductPackagingModal } from './ProductPackagingModal'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { generateInternalBarcode } from '../../lib/barcode'
 
 const { Text } = Typography
 const MAX_IMAGES = 2
@@ -121,6 +130,27 @@ export function ProductManagement({ products, role, onSave }: Props) {
     })
   }
 
+  function generateBarcode() {
+    let barcode = generateInternalBarcode()
+    while (products.some((product) => product.id !== editing?.id && product.sku === barcode))
+      barcode = generateInternalBarcode()
+    form.setFieldValue('sku', barcode)
+  }
+
+  function printBarcode() {
+    const barcode = String(form.getFieldValue('sku') ?? '').trim()
+    if (!barcode) return
+    const label = String(form.getFieldValue('name') ?? 'Product').trim()
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    JsBarcode(svg, barcode, { format: 'CODE128', displayValue: true, margin: 8, height: 58, fontSize: 14 })
+    const popup = window.open('', '_blank', 'width=420,height=280')
+    if (!popup) return
+    popup.document.write(
+      `<!doctype html><html><head><title>Barcode label</title><style>body{font-family:Arial,sans-serif;padding:28px}.label{width:300px;border:1px solid #ddd;padding:16px;text-align:center}.name{font-weight:700;margin-bottom:10px}</style></head><body><div class="label"><div class="name">${label.replace(/[<>&]/g, '')}</div>${svg.outerHTML}</div><script>window.onload=()=>window.print()</script></body></html>`,
+    )
+    popup.document.close()
+  }
+
   const columns = [
     {
       title: 'Product',
@@ -212,8 +242,31 @@ export function ProductManagement({ products, role, onSave }: Props) {
           <Form.Item name="name" label="Product name" rules={[{ required: true }]}>
             <Input size="large" />
           </Form.Item>
-          <Form.Item name="sku" label="SKU / barcode" rules={[{ required: true }]}>
-            <Input size="large" />
+          <Form.Item
+            name="sku"
+            label="SKU / barcode"
+            extra="Use the supplier barcode, or generate a unique internal Code 128 barcode."
+            rules={[{ required: true, message: 'Enter or generate a barcode' }]}
+          >
+            <Input
+              size="large"
+              addonAfter={
+                <Button type="text" size="small" icon={<BarcodeOutlined />} onClick={generateBarcode}>
+                  Generate
+                </Button>
+              }
+            />
+          </Form.Item>
+          <Form.Item shouldUpdate noStyle>
+            {() =>
+              form.getFieldValue('sku') && (
+                <div className="-mt-4 mb-4">
+                  <Button type="link" size="small" icon={<PrinterOutlined />} onClick={printBarcode}>
+                    Print barcode label
+                  </Button>
+                </div>
+              )
+            }
           </Form.Item>
           <Form.Item name="description" label="Online description">
             <Input.TextArea rows={3} />

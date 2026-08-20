@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { useEffect, useMemo, useState } from 'react'
 import { formatNaira } from '../lib/currency'
 import { supabase } from '../supabase'
-import type { Sale } from '../types'
+import type { Role, Sale } from '../types'
 import { db } from '../db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ServiceDashboard } from '../features/services/ServiceDashboard'
@@ -33,7 +33,15 @@ function rangeFor(period: Period, anchor: string) {
   }
   return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
 }
-export function SummaryPage({ sales }: { sales: Sale[] }) {
+export function SummaryPage({
+  sales,
+  role,
+  staffName,
+}: {
+  sales: Sale[]
+  role: Role
+  staffName?: string
+}) {
   const [period, setPeriod] = useState<Period>('day')
   const [anchor, setAnchor] = useState(new Date().toISOString().slice(0, 10))
   const [expenses, setExpenses] = useState<RemoteExpense[]>([])
@@ -222,6 +230,124 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
     1,
     ...financialMetrics.map((metric) => metric.value),
     ...paymentRows.map((row) => row.total),
+  )
+  const cashierSales = filteredSales.filter((sale) => sale.cashier === staffName)
+  const cashierSalesTotal = cashierSales.reduce((sum, sale) => sum + sale.total, 0)
+  const cashierPaymentRows = Object.entries(
+    cashierSales.reduce<Record<string, number>>(
+      (totals, sale) => ({ ...totals, [sale.paymentMethod]: (totals[sale.paymentMethod] ?? 0) + sale.total }),
+      {},
+    ),
+  ).map(([method, total]) => ({ method, total }))
+  const pendingOrders = sales
+    .filter(
+      (sale) =>
+        sale.paymentMethod === 'order' &&
+        sale.status !== 'returned' &&
+        !['fulfilled', 'cancelled'].includes(sale.orderStatus ?? 'pending'),
+    )
+    .sort((a, b) => (a.creditDueDate ?? '9999-12-31').localeCompare(b.creditDueDate ?? '9999-12-31'))
+  const dueCredits = sales
+    .filter(
+      (sale) =>
+        sale.paymentMethod === 'credit' &&
+        sale.status !== 'returned' &&
+        !sale.creditSettledAt &&
+        Boolean(sale.creditDueDate) &&
+        sale.creditDueDate! <= dayjs().format('YYYY-MM-DD'),
+    )
+    .sort((a, b) => (a.creditDueDate ?? '').localeCompare(b.creditDueDate ?? ''))
+  const activeShift = shifts.find((shift) => !shift.closedAt)
+  const cashierDashboard = (
+    <div className="space-y-4">
+      <div>
+        <h2 className="mb-1 text-xl font-semibold text-slate-900">My workday</h2>
+        <p className="mb-0 text-sm text-slate-500">Your sales and customer follow-ups for this shift.</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <Statistic title="My sales" value={cashierSalesTotal} formatter={(value) => formatNaira(Number(value))} />
+        </Card>
+        <Card>
+          <Statistic title="My transactions" value={cashierSales.length} />
+        </Card>
+        <Card>
+          <Statistic title="Pending orders" value={pendingOrders.length} />
+        </Card>
+        <Card>
+          <Statistic title="Due credits" value={dueCredits.length} />
+        </Card>
+      </div>
+      <Card title="My shift">
+        {activeShift ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="mb-0 text-sm font-medium text-slate-900">Shift open</p>
+              <p className="mb-0 text-xs text-slate-500">
+                Opened {dayjs(activeShift.openedAt).format('DD MMM, h:mm A')}
+              </p>
+            </div>
+            <Tag color="success">Opening cash {formatNaira(activeShift.openingCash)}</Tag>
+          </div>
+        ) : (
+          <p className="mb-0 text-sm text-slate-500">No open shift. Start one from Cash shifts before taking cash sales.</p>
+        )}
+      </Card>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card title="Pending customer orders" className="min-w-0">
+          <div className="dashboard-table-scroll">
+            <Table
+              rowKey="id"
+              size="small"
+              pagination={false}
+              scroll={{ x: 560 }}
+              dataSource={pendingOrders.slice(0, 6)}
+              columns={[
+                { title: 'Client', dataIndex: 'creditCustomerName', render: (value: string) => value || 'Unnamed client' },
+                { title: 'Status', dataIndex: 'orderStatus', render: (value: string) => <Tag className="capitalize">{(value ?? 'pending').replace('_', ' ')}</Tag> },
+                { title: 'Delivery', dataIndex: 'creditDueDate', render: (value: string) => value ? dayjs(value).format('DD MMM') : 'Not set' },
+                { title: 'Value', dataIndex: 'total', align: 'right', render: (value: number) => formatNaira(value) },
+              ]}
+              locale={{ emptyText: 'No pending customer orders.' }}
+            />
+          </div>
+        </Card>
+        <Card title="Credits due for follow-up" className="min-w-0">
+          <div className="dashboard-table-scroll">
+            <Table
+              rowKey="id"
+              size="small"
+              pagination={false}
+              scroll={{ x: 560 }}
+              dataSource={dueCredits.slice(0, 6)}
+              columns={[
+                { title: 'Receipt', dataIndex: 'receiptNo' },
+                { title: 'Customer', dataIndex: 'creditCustomerName', render: (value: string) => value || 'Unnamed customer' },
+                { title: 'Due date', dataIndex: 'creditDueDate', render: (value: string) => dayjs(value).format('DD MMM YYYY') },
+                { title: 'Sale value', dataIndex: 'total', align: 'right', render: (value: number) => formatNaira(value) },
+              ]}
+              locale={{ emptyText: 'No credits due today.' }}
+            />
+          </div>
+        </Card>
+      </div>
+      <Card title="My sales by payment method" className="min-w-0">
+        <div className="dashboard-table-scroll">
+          <Table
+            rowKey="method"
+            size="small"
+            pagination={false}
+            scroll={{ x: 460 }}
+            dataSource={cashierPaymentRows}
+            columns={[
+              { title: 'Payment method', dataIndex: 'method', render: (value: string) => <Tag className="capitalize">{value.replace('_', ' ')}</Tag> },
+              { title: 'Amount', dataIndex: 'total', align: 'right', render: (value: number) => formatNaira(value) },
+            ]}
+            locale={{ emptyText: 'No sales in this period.' }}
+          />
+        </div>
+      </Card>
+    </div>
   )
   const retailDashboard = (
     <div className="space-y-4">
@@ -454,6 +580,7 @@ export function SummaryPage({ sales }: { sales: Sale[] }) {
     { key: 'retail', label: 'Retail', children: retailDashboard },
     { key: 'services', label: 'Services', children: <ServiceDashboard start={start} end={end} /> },
   ].filter((tab) => businessModes.includes(tab.key))
+  if (role === 'cashier') return <div id="end-of-day-report">{holder}{cashierDashboard}</div>
   return (
     <div id="end-of-day-report" className="space-y-6">
       {holder}

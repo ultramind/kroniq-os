@@ -23,6 +23,7 @@ type PosState = {
   updateQuantity: (id: string, quantity: number) => void
   updateUnitPrice: (id: string, price: number) => void
   clearCart: () => void
+  resetSession: () => void
 }
 
 export const usePosStore = create<PosState>((set) => ({
@@ -103,4 +104,6 @@ export const usePosStore = create<PosState>((set) => ({
     playCheckoutSound('clear')
     set({ cart: [], search: '', paymentMethod: 'cash', discountPercent: 0 })
   },
+  resetSession: () =>
+    set({ cart: [], search: '', paymentMethod: 'cash', discountPercent: 0, role: 'cashier' }),
 }))

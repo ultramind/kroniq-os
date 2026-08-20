@@ -113,12 +113,18 @@ Deno.serve(async (request) => {
     const {
       companyName,
       branchName,
-      fullName,
+      fullName: submittedFullName,
       businessMode = 'retail',
       currencyCode = 'NGN',
     } = await request.json()
+    const fullName =
+      typeof submittedFullName === 'string' && submittedFullName.trim()
+        ? submittedFullName.trim()
+        : typeof user.user_metadata?.full_name === 'string'
+          ? user.user_metadata.full_name.trim()
+          : ''
     if (![companyName, branchName, fullName].every((value) => typeof value === 'string' && value.trim())) {
-      return json({ error: 'Company name, first branch name, and your name are required.' }, 400)
+      return json({ error: 'Company name, first branch name, and an account owner name are required.' }, 400)
     }
     if (!['retail', 'services', 'hybrid'].includes(businessMode))
       return json({ error: 'Choose a valid business model.' }, 400)
@@ -160,7 +166,7 @@ Deno.serve(async (request) => {
         }),
         adminClient
           .from('profiles')
-          .upsert({ id: user.id, store_id: store.id, full_name: fullName.trim(), role: 'admin' }),
+          .upsert({ id: user.id, store_id: store.id, full_name: fullName, role: 'admin' }),
         adminClient
           .from('organization_memberships')
           .upsert({ organization_id: organization.id, user_id: user.id, role: 'admin', status: 'active' }),

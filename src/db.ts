@@ -21,8 +21,8 @@ class PosDatabase extends Dexie {
   stockDeliveries!: EntityTable<StockDelivery, 'id'>
   stockMovements!: EntityTable<StockMovement, 'id'>
   outbox!: EntityTable<SyncEvent, 'id'>
-  constructor() {
-    super('naira-pos')
+  constructor(name: string) {
+    super(name)
     this.version(1).stores({
       products: 'id, sku, name, category',
       sales: 'id, createdAt, synced',
@@ -81,7 +81,85 @@ class PosDatabase extends Dexie {
     })
   }
 }
-export const db = new PosDatabase()
+
+const legacyDatabaseName = 'naira-pos'
+const scopedDatabaseName = (userId: string, organizationId: string) =>
+  `kroniqos-pos:${userId}:${organizationId}`
+
+// This binding intentionally changes before a workspace mounts. ES module
+// imports are live bindings, so all POS services use the active workspace DB.
+export let db = new PosDatabase(legacyDatabaseName)
+
+export async function selectOfflineDatabase(userId: string, organizationId: string) {
+  const nextName = scopedDatabaseName(userId, organizationId)
+  if (db.name === nextName) return
+  db.close()
+  db = new PosDatabase(nextName)
+  await db.open()
+}
+
+/**
+ * Move a verified legacy cache into its first scoped database. It runs only
+ * when the saved owner and company match, so old data is never copied into a
+ * different account or organisation.
+ */
+export async function migrateLegacyOfflineDatabase(userId: string, organizationId: string) {
+  const targetName = scopedDatabaseName(userId, organizationId)
+  if (db.name !== targetName) return
+  const legacy = new PosDatabase(legacyDatabaseName)
+  await legacy.open()
+  try {
+    if ((await db.products.count()) > 0 || (await db.sales.count()) > 0 || (await db.outbox.count()) > 0)
+      return
+    const [
+      products,
+      sales,
+      saleItems,
+      shifts,
+      heldSales,
+      returnActivities,
+      stockDeliveries,
+      stockMovements,
+      outbox,
+    ] = await Promise.all([
+      legacy.products.toArray(),
+      legacy.sales.toArray(),
+      legacy.saleItems.toArray(),
+      legacy.shifts.toArray(),
+      legacy.heldSales.toArray(),
+      legacy.returnActivities.toArray(),
+      legacy.stockDeliveries.toArray(),
+      legacy.stockMovements.toArray(),
+      legacy.outbox.toArray(),
+    ])
+    if (
+      !products.length &&
+      !sales.length &&
+      !saleItems.length &&
+      !shifts.length &&
+      !heldSales.length &&
+      !returnActivities.length &&
+      !stockDeliveries.length &&
+      !stockMovements.length &&
+      !outbox.length
+    )
+      return
+    await db.transaction('rw', [...db.tables], async () => {
+      await db.products.bulkPut(products)
+      await db.sales.bulkPut(sales)
+      await db.saleItems.bulkPut(saleItems)
+      await db.shifts.bulkPut(shifts)
+      await db.heldSales.bulkPut(heldSales)
+      await db.returnActivities.bulkPut(returnActivities)
+      await db.stockDeliveries.bulkPut(stockDeliveries)
+      await db.stockMovements.bulkPut(stockMovements)
+      await db.outbox.bulkPut(outbox)
+    })
+    await legacy.delete()
+  } finally {
+    legacy.close()
+  }
+}
 
 export const starterProducts: Product[] = [
   {

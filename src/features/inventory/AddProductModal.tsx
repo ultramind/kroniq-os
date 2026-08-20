@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import JsBarcode from 'jsbarcode'
 import { CameraBarcodeScannerModal } from '../pos/CameraBarcodeScannerModal'
 import { CurrencyInput } from '../../components/CurrencyInput'
+import { generateInternalBarcode } from '../../lib/barcode'
 
 export type ProductFormValues = {
   name: string
@@ -42,8 +43,7 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
   }, [form, initialSku, open])
 
   function generateBarcode() {
-    const barcode = `KRN${Date.now().toString().slice(-10)}${Math.floor(Math.random() * 90 + 10)}`
-    form.setFieldValue('sku', barcode)
+    form.setFieldValue('sku', generateInternalBarcode())
   }
 
   function printBarcode() {

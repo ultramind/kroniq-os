@@ -25,6 +25,10 @@ export function publishCustomerDisplay(cart: CartItem[], total: number, paymentM
   }
 }
 
+export function clearCustomerDisplay() {
+  localStorage.removeItem(storageKey)
+}
+
 export function readCustomerDisplay(): CustomerDisplayState {
   try {
     const value = localStorage.getItem(storageKey)
