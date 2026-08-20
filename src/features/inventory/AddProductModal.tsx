@@ -78,6 +78,10 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
           form={form}
           layout="vertical"
           onFinish={onSave}
+          onFinishFailed={({ errorFields }) => {
+            const firstField = errorFields[0]?.name
+            if (firstField) form.scrollToField(firstField, { block: 'center' })
+          }}
           initialValues={{ stock: 0 }}
         >
           <div className="mb-4 flex flex-wrap gap-2">

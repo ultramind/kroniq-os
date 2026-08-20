@@ -396,92 +396,72 @@ export function App({
   }
   async function saveProduct(values: ProductFormValues) {
     setSavingProduct(true)
-    const categoryName = values.category[0]?.trim().replace(/\s+/g, ' ') || 'Uncategorised'
-    const product: Product = {
-      id: crypto.randomUUID(),
-      name: values.name,
-      sku: values.sku,
-      price: values.price,
-      costPrice: values.costPrice,
-      minimumSellingPrice: values.minimumSellingPrice,
-      stock: values.stock,
-      lowStockThreshold: values.lowStockThreshold,
-      category: categoryName,
+    try {
+      const categoryName = values.category[0]?.trim().replace(/\s+/g, ' ') || 'Uncategorised'
+      const product: Product = {
+        id: crypto.randomUUID(),
+        name: values.name,
+        sku: values.sku,
+        price: values.price,
+        costPrice: values.costPrice,
+        minimumSellingPrice: values.minimumSellingPrice,
+        stock: values.stock,
+        lowStockThreshold: values.lowStockThreshold,
+        category: categoryName,
+      }
+      if (supabase) {
+        if (!navigator.onLine) {
+          api.error('Adding products requires an internet connection.')
+          setSavingProduct(false)
+          return
+        }
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('store_id')
+          .limit(1)
+        const profile = profiles?.[0]
+        if (profileError || !profile) {
+          api.error(profileError?.message ?? 'Store profile not found')
+          setSavingProduct(false)
+          return
+        }
+        const { data: categoryId, error: categoryError } = await supabase.rpc(
+          'get_or_create_current_category',
+          {
+            p_name: categoryName,
+          },
+        )
+        if (categoryError || !categoryId) {
+          api.error(categoryError?.message ?? 'Could not create product category')
+          return
+        }
+        const { error } = await supabase.from('products').insert({
+          id: product.id,
+          store_id: profile.store_id,
+          category_id: categoryId,
+          name: product.name,
+          sku: product.sku,
+          price_kobo: Math.round(product.price * 100),
+          cost_price_kobo: Math.round(product.costPrice * 100),
+          minimum_selling_price_kobo:
+            product.minimumSellingPrice === undefined ? null : Math.round(product.minimumSellingPrice * 100),
+          stock_quantity: product.stock,
+          low_stock_threshold: product.lowStockThreshold,
+        })
+        if (error) {
+          api.error(error.message)
+          setSavingProduct(false)
+          return
+        }
+      }
+      await db.products.put(product)
+      setInventoryOpen(false)
+      api.success(`${product.name} added to inventory.`)
+    } catch (error) {
+      api.error(error instanceof Error ? error.message : 'Could not add this product. Please try again.')
+    } finally {
+      setSavingProduct(false)
     }
-    if (supabase) {
-      if (!navigator.onLine) {
-        api.error('Adding products requires an internet connection.')
-        setSavingProduct(false)
-        return
-      }
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('store_id')
-        .limit(1)
-      const profile = profiles?.[0]
-      if (profileError || !profile) {
-        api.error(profileError?.message ?? 'Store profile not found')
-        setSavingProduct(false)
-        return
-      }
-      const { data: existingCategory, error: categoryLookupError } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('store_id', profile.store_id)
-        .eq('name', categoryName)
-        .maybeSingle()
-      if (categoryLookupError) {
-        api.error(categoryLookupError.message)
-        setSavingProduct(false)
-        return
-      }
-      let categoryId = existingCategory?.id
-      if (!categoryId) {
-        const { data: createdCategory, error: categoryCreateError } = await supabase
-          .from('categories')
-          .insert({ store_id: profile.store_id, name: categoryName })
-          .select('id')
-          .maybeSingle()
-        if (categoryCreateError || !createdCategory) {
-          // Another manager may have created the same category at the same
-          // time. Read it once more before treating this as a real failure.
-          const { data: concurrentCategory } = await supabase
-            .from('categories')
-            .select('id')
-            .eq('store_id', profile.store_id)
-            .eq('name', categoryName)
-            .maybeSingle()
-          categoryId = concurrentCategory?.id
-          if (!categoryId) {
-            api.error(categoryCreateError?.message ?? 'Could not create product category')
-            setSavingProduct(false)
-            return
-          }
-        } else categoryId = createdCategory.id
-      }
-      const { error } = await supabase.from('products').insert({
-        id: product.id,
-        store_id: profile.store_id,
-        category_id: categoryId,
-        name: product.name,
-        sku: product.sku,
-        price_kobo: Math.round(product.price * 100),
-        cost_price_kobo: Math.round(product.costPrice * 100),
-        minimum_selling_price_kobo:
-          product.minimumSellingPrice === undefined ? null : Math.round(product.minimumSellingPrice * 100),
-        stock_quantity: product.stock,
-        low_stock_threshold: product.lowStockThreshold,
-      })
-      if (error) {
-        api.error(error.message)
-        setSavingProduct(false)
-        return
-      }
-    }
-    await db.products.put(product)
-    setSavingProduct(false)
-    setInventoryOpen(false)
-    api.success(`${product.name} added to inventory.`)
   }
   async function saveAdjustment(values: { quantityDelta: number; reason: StockMovementReason }) {
     if (!adjustingProduct) return
