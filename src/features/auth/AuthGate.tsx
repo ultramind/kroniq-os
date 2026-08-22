@@ -14,6 +14,7 @@ import { BillingPanel } from '../billing/BillingPanel'
 import { MarketingSite } from '../marketing/MarketingSite'
 import { StorefrontPage } from '../../pages/StorefrontPage'
 import { CompanyWorkspacePicker, type CompanyWorkspace } from './CompanyWorkspacePicker'
+import { ForgotPassword, ResetPassword } from './PasswordRecovery'
 import { useTheme } from '../../app/theme'
 import { pullProducts } from '../../sync'
 import {
@@ -36,6 +37,8 @@ export function AuthGate() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const platformRoute = pathname.startsWith('/platform')
+  const forgotPasswordRoute = pathname === '/forgot-password'
+  const resetPasswordRoute = pathname === '/reset-password'
   const publicStorefrontRoute = pathname.startsWith('/shop/')
   const publicMarketingRoute =
     pathname === '/' ||
@@ -124,7 +127,7 @@ export function AuthGate() {
     window.location.reload()
   }
   useEffect(() => {
-    if (publicStorefrontRoute) {
+    if (publicStorefrontRoute || forgotPasswordRoute || resetPasswordRoute) {
       setState({ loading: false })
       return
     }
@@ -386,8 +389,10 @@ export function AuthGate() {
       void load(event === 'SIGNED_IN')
     })
     return () => listener.subscription.unsubscribe()
-  }, [platformRoute, publicStorefrontRoute])
+  }, [forgotPasswordRoute, platformRoute, publicStorefrontRoute, resetPasswordRoute])
   if (publicStorefrontRoute) return <StorefrontPage />
+  if (forgotPasswordRoute) return <ForgotPassword />
+  if (resetPasswordRoute) return <ResetPassword />
   if (state.workspaceChoices)
     return (
       <CompanyWorkspacePicker
@@ -436,7 +441,7 @@ export function AuthGate() {
       <CompanyRegistration onBack={() => navigate('/login')} onSignedIn={() => window.location.reload()} />
     )
   if (state.unauthenticated && pathname === '/login')
-    return <Login onRegister={() => navigate('/register')} />
+    return <Login onRegister={() => navigate('/register')} onForgotPassword={() => navigate('/forgot-password')} />
   if (state.unauthenticated && publicMarketingRoute) return <MarketingSite />
   if (state.startupError)
     return (
@@ -491,6 +496,7 @@ export function AuthGate() {
       <Login
         platform={platformRoute}
         onRegister={platformRoute ? undefined : () => setState({ loading: false, registering: true })}
+        onForgotPassword={() => navigate('/forgot-password')}
       />
     )
   return <App enforcedRole={state.role} enforcedStaffName={state.staffName} />

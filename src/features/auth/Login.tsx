@@ -12,7 +12,15 @@ import { supabase } from '../../supabase'
 
 const { Title, Text } = Typography
 
-export function Login({ onRegister, platform }: { onRegister?: () => void; platform?: boolean }) {
+export function Login({
+  onRegister,
+  onForgotPassword,
+  platform,
+}: {
+  onRegister?: () => void
+  onForgotPassword?: () => void
+  platform?: boolean
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -124,6 +132,15 @@ export function Login({ onRegister, platform }: { onRegister?: () => void; platf
                   onChange={(event) => setPassword(event.target.value)}
                   onPressEnter={() => void signIn()}
                 />
+                <div className="mt-2 text-right">
+                  <Button
+                    type="link"
+                    className="!h-auto !px-0 !text-xs !font-semibold !text-[#0B1121]"
+                    onClick={onForgotPassword}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
               </div>
               <Button
                 type="primary"

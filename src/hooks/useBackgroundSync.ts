@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { pullProducts, pullSales, syncOutbox } from '../sync'
 
-async function withTimeout<T>(request: Promise<T>, label: string): Promise<T> {
-  return await Promise.race([
-    request,
-    new Promise<never>((_, reject) =>
-      window.setTimeout(() => reject(new Error(`${label} timed out. It will retry automatically.`)), 15_000),
-    ),
-  ])
+async function withTimeout<T>(request: Promise<T>, label: string, timeoutMs: number): Promise<T> {
+  let timeoutId: number | undefined
+  try {
+    return await Promise.race([
+      request,
+      new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(
+          () => reject(new Error(`${label} timed out. It will retry automatically.`)),
+          timeoutMs,
+        )
+      }),
+    ])
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+  }
 }
 
 export function useBackgroundSync(onSynced: (count: number) => void, onError: (message?: string) => void) {
@@ -18,14 +26,18 @@ export function useBackgroundSync(onSynced: (count: number) => void, onError: (m
     try {
       // Push local sales before refreshing catalogue data, so an intermittent PWA
       // connection cannot overwrite the local view during a pending checkout.
-      const result = await withTimeout(syncOutbox(), 'Sale sync')
-      const [products, sales] = await Promise.all([
-        withTimeout(pullProducts(), 'Catalogue refresh'),
-        withTimeout(pullSales(), 'Sales refresh'),
+      const result = await withTimeout(syncOutbox(), 'Sale sync', 20_000)
+      await Promise.all([
+        // Read refreshes do not alter a pending sale. Give catalogue requests
+        // room on slower connections and keep the existing IndexedDB data if a
+        // request is late; a slow download is not a sync failure.
+        withTimeout(pullProducts(), 'Catalogue refresh', 45_000),
+        withTimeout(pullSales(), 'Sales refresh', 45_000),
       ])
-      if (result.error || products.error || sales.error)
-        onError(result.error ?? products.error ?? sales.error)
-      else onError(undefined)
+      // Only queued write failures require attention. Catalogue and sales
+      // refreshes are safe to retry in the background and must not alarm a
+      // cashier who has no pending records.
+      onError(result.error)
       if (result.synced) onSynced(result.synced)
     } catch (error) {
       onError(

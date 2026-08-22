@@ -21,6 +21,7 @@
     "dexie-react-hooks": "^1.1.7",
     "jsbarcode": "^3.12.3",
     "postcss": "^8.5.25",
+    "qz-tray": "^2.2.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.18.2",

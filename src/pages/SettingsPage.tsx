@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { Button, Card, Form, Input, InputNumber, Modal, Select, Switch, Tabs, message } from 'antd'
+import { Button, Card, Collapse, Form, Input, InputNumber, Modal, Select, Switch, Tabs, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { SeedStarterCatalogue } from '../features/admin/SeedStarterCatalogue'
@@ -9,6 +9,7 @@ import { BillingPanel } from '../features/billing/BillingPanel'
 import { SupportTicketForm } from '../features/support/SupportTicketForm'
 import { StorefrontSettings } from '../features/storefront/StorefrontSettings'
 import { StorefrontContentManager } from '../features/storefront/StorefrontContentManager'
+import { PrinterSettingsPanel } from '../features/printing/PrinterSettingsPanel'
 import {
   defaultStoreSettings,
   getStoreSettings,
@@ -159,6 +160,30 @@ export function SettingsPage({ role }: { role: Role }) {
       ]}
     />
   )
+  const printingSettings = (
+    <div className="space-y-5">
+      <Card title="Receipt printing" className="max-w-2xl">
+        <p className="mb-2 text-sm text-slate-600">
+          Kroniqos prints from the browser by default. On Android POS terminals, tap Print receipt and choose
+          the terminal or Bluetooth printer from Android’s print screen.
+        </p>
+        <p className="mb-0 text-xs text-slate-500">
+          When a printer is unavailable, cashiers can use Share receipt to send a text receipt through
+          WhatsApp, SMS, or another installed app.
+        </p>
+      </Card>
+      <Collapse
+        className="max-w-2xl"
+        items={[
+          {
+            key: 'desktop-direct-printing',
+            label: 'Advanced: direct printing on a desktop computer',
+            children: <PrinterSettingsPanel />,
+          },
+        ]}
+      />
+    </div>
+  )
   const clearDeviceWorkspace = async () => {
     const pendingRecords = await db.outbox.count()
     if (pendingRecords) {
@@ -192,6 +217,7 @@ export function SettingsPage({ role }: { role: Role }) {
           defaultActiveKey="store"
           items={[
             { key: 'store', label: 'Store', children: storeSettings },
+            { key: 'printing', label: 'Printing', children: printingSettings },
             ...(canUseStorefront
               ? [{ key: 'storefront', label: 'Online storefront', children: onlineStorefront }]
               : []),
