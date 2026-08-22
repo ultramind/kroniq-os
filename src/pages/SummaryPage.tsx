@@ -8,6 +8,7 @@ import type { Role, Sale } from '../types'
 import { db } from '../db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ServiceDashboard } from '../features/services/ServiceDashboard'
+import { ShareContentButton } from '../components/ShareContentButton'
 
 type Period = 'day' | 'week' | 'month' | 'year'
 type RemoteExpense = { id: string; amount: number; spentAt: string; description: string }
@@ -33,15 +34,7 @@ function rangeFor(period: Period, anchor: string) {
   }
   return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
 }
-export function SummaryPage({
-  sales,
-  role,
-  staffName,
-}: {
-  sales: Sale[]
-  role: Role
-  staffName?: string
-}) {
+export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: Role; staffName?: string }) {
   const [period, setPeriod] = useState<Period>('day')
   const [anchor, setAnchor] = useState(new Date().toISOString().slice(0, 10))
   const [expenses, setExpenses] = useState<RemoteExpense[]>([])
@@ -266,7 +259,11 @@ export function SummaryPage({
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <Statistic title="My sales" value={cashierSalesTotal} formatter={(value) => formatNaira(Number(value))} />
+          <Statistic
+            title="My sales"
+            value={cashierSalesTotal}
+            formatter={(value) => formatNaira(Number(value))}
+          />
         </Card>
         <Card>
           <Statistic title="My transactions" value={cashierSales.length} />
@@ -290,7 +287,9 @@ export function SummaryPage({
             <Tag color="success">Opening cash {formatNaira(activeShift.openingCash)}</Tag>
           </div>
         ) : (
-          <p className="mb-0 text-sm text-slate-500">No open shift. Start one from Cash shifts before taking cash sales.</p>
+          <p className="mb-0 text-sm text-slate-500">
+            No open shift. Start one from Cash shifts before taking cash sales.
+          </p>
         )}
       </Card>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -303,10 +302,29 @@ export function SummaryPage({
               scroll={{ x: 560 }}
               dataSource={pendingOrders.slice(0, 6)}
               columns={[
-                { title: 'Client', dataIndex: 'creditCustomerName', render: (value: string) => value || 'Unnamed client' },
-                { title: 'Status', dataIndex: 'orderStatus', render: (value: string) => <Tag className="capitalize">{(value ?? 'pending').replace('_', ' ')}</Tag> },
-                { title: 'Delivery', dataIndex: 'creditDueDate', render: (value: string) => value ? dayjs(value).format('DD MMM') : 'Not set' },
-                { title: 'Value', dataIndex: 'total', align: 'right', render: (value: number) => formatNaira(value) },
+                {
+                  title: 'Client',
+                  dataIndex: 'creditCustomerName',
+                  render: (value: string) => value || 'Unnamed client',
+                },
+                {
+                  title: 'Status',
+                  dataIndex: 'orderStatus',
+                  render: (value: string) => (
+                    <Tag className="capitalize">{(value ?? 'pending').replace('_', ' ')}</Tag>
+                  ),
+                },
+                {
+                  title: 'Delivery',
+                  dataIndex: 'creditDueDate',
+                  render: (value: string) => (value ? dayjs(value).format('DD MMM') : 'Not set'),
+                },
+                {
+                  title: 'Value',
+                  dataIndex: 'total',
+                  align: 'right',
+                  render: (value: number) => formatNaira(value),
+                },
               ]}
               locale={{ emptyText: 'No pending customer orders.' }}
             />
@@ -322,9 +340,22 @@ export function SummaryPage({
               dataSource={dueCredits.slice(0, 6)}
               columns={[
                 { title: 'Receipt', dataIndex: 'receiptNo' },
-                { title: 'Customer', dataIndex: 'creditCustomerName', render: (value: string) => value || 'Unnamed customer' },
-                { title: 'Due date', dataIndex: 'creditDueDate', render: (value: string) => dayjs(value).format('DD MMM YYYY') },
-                { title: 'Sale value', dataIndex: 'total', align: 'right', render: (value: number) => formatNaira(value) },
+                {
+                  title: 'Customer',
+                  dataIndex: 'creditCustomerName',
+                  render: (value: string) => value || 'Unnamed customer',
+                },
+                {
+                  title: 'Due date',
+                  dataIndex: 'creditDueDate',
+                  render: (value: string) => dayjs(value).format('DD MMM YYYY'),
+                },
+                {
+                  title: 'Sale value',
+                  dataIndex: 'total',
+                  align: 'right',
+                  render: (value: number) => formatNaira(value),
+                },
               ]}
               locale={{ emptyText: 'No credits due today.' }}
             />
@@ -340,8 +371,17 @@ export function SummaryPage({
             scroll={{ x: 460 }}
             dataSource={cashierPaymentRows}
             columns={[
-              { title: 'Payment method', dataIndex: 'method', render: (value: string) => <Tag className="capitalize">{value.replace('_', ' ')}</Tag> },
-              { title: 'Amount', dataIndex: 'total', align: 'right', render: (value: number) => formatNaira(value) },
+              {
+                title: 'Payment method',
+                dataIndex: 'method',
+                render: (value: string) => <Tag className="capitalize">{value.replace('_', ' ')}</Tag>,
+              },
+              {
+                title: 'Amount',
+                dataIndex: 'total',
+                align: 'right',
+                render: (value: number) => formatNaira(value),
+              },
             ]}
             locale={{ emptyText: 'No sales in this period.' }}
           />
@@ -367,60 +407,62 @@ export function SummaryPage({
             .join('  |  ')}
         />
       ) : null}
-      <Card className="overflow-hidden" bodyStyle={{ padding: 0 }}>
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5">
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-              Order pipeline
-            </p>
-            <h3 className="mb-0 text-lg font-semibold text-[var(--text)]">Made-to-order performance</h3>
+      {orders.length > 0 && (
+        <Card className="overflow-hidden" bodyStyle={{ padding: 0 }}>
+          <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5">
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                Order pipeline
+              </p>
+              <h3 className="mb-0 text-lg font-semibold text-[var(--text)]">Made-to-order performance</h3>
+            </div>
+            <span className="whitespace-nowrap border border-[var(--border)] px-2 py-1 text-xs font-medium text-[var(--muted)]">
+              {activeOrders.length} open
+            </span>
           </div>
-          <span className="whitespace-nowrap border border-[var(--border)] px-2 py-1 text-xs font-medium text-[var(--muted)]">
-            {activeOrders.length} open
-          </span>
-        </div>
-        <div className="grid grid-cols-2 divide-y divide-[var(--border)] sm:divide-x sm:divide-y-0 xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
-          <div className="col-span-2 bg-[#0B1121] p-5 text-white sm:col-span-1 sm:row-span-2">
-            <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-300">
-              Open order value
-            </p>
-            <p className="mb-5 text-3xl font-semibold tracking-tight sm:text-4xl">
-              {formatNaira(openOrderValue)}
-            </p>
-            <div className="border-t border-white/15 pt-3 text-sm text-slate-300">
-              {activeOrders.length} active order{activeOrders.length === 1 ? '' : 's'} awaiting fulfilment
+          <div className="grid grid-cols-2 divide-y divide-[var(--border)] sm:divide-x sm:divide-y-0 xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
+            <div className="col-span-2 bg-[#0B1121] p-5 text-white sm:col-span-1 sm:row-span-2">
+              <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-300">
+                Open order value
+              </p>
+              <p className="mb-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+                {formatNaira(openOrderValue)}
+              </p>
+              <div className="border-t border-white/15 pt-3 text-sm text-slate-300">
+                {activeOrders.length} active order{activeOrders.length === 1 ? '' : 's'} awaiting fulfilment
+              </div>
+            </div>
+            <div className="p-4 sm:p-5">
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">Payments received</p>
+              <p className="mb-0 text-xl font-semibold text-[var(--text)]">
+                {formatNaira(orderPaymentsReceived)}
+              </p>
+            </div>
+            <div className="p-4 sm:p-5">
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">Outstanding balance</p>
+              <p className="mb-0 text-xl font-semibold text-[var(--text)]">{formatNaira(orderOutstanding)}</p>
+            </div>
+            <div className="p-4 sm:p-5">
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">Fulfilled revenue</p>
+              <p className="mb-0 text-xl font-semibold text-[var(--text)]">
+                {formatNaira(fulfilledOrderRevenue)}
+              </p>
+            </div>
+            <div className="p-4 sm:p-5">
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">Expected profit</p>
+              <p className="mb-0 text-xl font-semibold text-[var(--text)]">
+                {formatNaira(expectedOrderProfit)}
+              </p>
+              <p className="mb-0 mt-1 text-[11px] text-[var(--muted)]">Catalogue cost basis</p>
+            </div>
+            <div className="p-4 sm:p-5">
+              <p className="mb-1 text-xs font-medium text-[var(--muted)]">Actual profit</p>
+              <p className="mb-0 text-xl font-semibold text-[var(--text)]">{formatNaira(orderProfit)}</p>
+              <p className="mb-0 mt-1 text-[11px] text-[var(--muted)]">Final cost recorded</p>
             </div>
           </div>
-          <div className="p-4 sm:p-5">
-            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Payments received</p>
-            <p className="mb-0 text-xl font-semibold text-[var(--text)]">
-              {formatNaira(orderPaymentsReceived)}
-            </p>
-          </div>
-          <div className="p-4 sm:p-5">
-            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Outstanding balance</p>
-            <p className="mb-0 text-xl font-semibold text-[var(--text)]">{formatNaira(orderOutstanding)}</p>
-          </div>
-          <div className="p-4 sm:p-5">
-            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Fulfilled revenue</p>
-            <p className="mb-0 text-xl font-semibold text-[var(--text)]">
-              {formatNaira(fulfilledOrderRevenue)}
-            </p>
-          </div>
-          <div className="p-4 sm:p-5">
-            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Expected profit</p>
-            <p className="mb-0 text-xl font-semibold text-[var(--text)]">
-              {formatNaira(expectedOrderProfit)}
-            </p>
-            <p className="mb-0 mt-1 text-[11px] text-[var(--muted)]">Catalogue cost basis</p>
-          </div>
-          <div className="p-4 sm:p-5">
-            <p className="mb-1 text-xs font-medium text-[var(--muted)]">Actual profit</p>
-            <p className="mb-0 text-xl font-semibold text-[var(--text)]">{formatNaira(orderProfit)}</p>
-            <p className="mb-0 mt-1 text-[11px] text-[var(--muted)]">Final cost recorded</p>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Card>
           <Statistic
@@ -580,7 +622,13 @@ export function SummaryPage({
     { key: 'retail', label: 'Retail', children: retailDashboard },
     { key: 'services', label: 'Services', children: <ServiceDashboard start={start} end={end} /> },
   ].filter((tab) => businessModes.includes(tab.key))
-  if (role === 'cashier') return <div id="end-of-day-report">{holder}{cashierDashboard}</div>
+  if (role === 'cashier')
+    return (
+      <div id="end-of-day-report">
+        {holder}
+        {cashierDashboard}
+      </div>
+    )
   return (
     <div id="end-of-day-report" className="space-y-6">
       {holder}
@@ -609,6 +657,11 @@ export function SummaryPage({
           <Button icon={<PrinterOutlined />} onClick={() => window.print()}>
             Print
           </Button>
+          <ShareContentButton
+            elementId="end-of-day-report"
+            title="Kroniqos business dashboard"
+            label="Share"
+          />
         </div>
       </div>
       <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">

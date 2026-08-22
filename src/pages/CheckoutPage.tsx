@@ -69,6 +69,7 @@ export function CheckoutPage({
   const [cartDrawerWidth, setCartDrawerWidth] = useState('min(100vw, 430px)')
   const [cartReceiving, setCartReceiving] = useState(false)
   const searchInputRef = useRef<InputRef>(null)
+  const checkoutAttemptedRef = useRef(false)
   const heldSales = useLiveQuery(() => db.heldSales.toArray(), []) ?? []
   const hold =
     onHold ??
@@ -95,6 +96,14 @@ export function CheckoutPage({
     media.addEventListener('change', updateWidth)
     return () => media.removeEventListener('change', updateWidth)
   }, [])
+  useEffect(() => {
+    // On phones and tablets, a successful checkout should return the cashier
+    // to the product list instead of leaving an empty cart drawer open.
+    if (!checkoutAttemptedRef.current || checkoutSaving || cart.length) return
+    checkoutAttemptedRef.current = false
+    setCartDrawerOpen(false)
+    navigate('/checkout', { replace: true })
+  }, [cart.length, checkoutSaving, navigate])
   useEffect(() => {
     let timer: number | undefined
     const animateCart = () => {
@@ -195,7 +204,10 @@ export function CheckoutPage({
       onMethodChange={onPaymentChange}
       onQuantityChange={onQuantityChange}
       onUnitPriceChange={onUnitPriceChange}
-      onCheckout={onCheckout}
+      onCheckout={(credit) => {
+        checkoutAttemptedRef.current = true
+        onCheckout(credit)
+      }}
       onHistoricalCheckout={onHistoricalCheckout}
       historicalSaving={historicalSaving}
       checkoutSaving={checkoutSaving}

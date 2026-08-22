@@ -1,4 +1,10 @@
-import { DownloadOutlined, FilePdfOutlined, PlusOutlined, PrinterOutlined } from '@ant-design/icons'
+import {
+  DownloadOutlined,
+  FilePdfOutlined,
+  PlusOutlined,
+  PrinterOutlined,
+  ShareAltOutlined,
+} from '@ant-design/icons'
 import {
   Button,
   DatePicker,
@@ -304,6 +310,32 @@ export function ProjectDetailsDrawer({
     )
     popup.document.close()
   }
+  const shareInvoice = async () => {
+    if (!project) return
+    const totalPaid = payments.reduce((sum, payment) => sum + payment.amount_kobo, 0)
+    const balance = Math.max(0, project.quoted_amount_kobo - totalPaid)
+    const text = [
+      brand.company_name,
+      'SERVICE CONTRACT INVOICE',
+      `Contract: ${project.title}`,
+      `Client: ${project.customer?.full_name ?? 'Client'}`,
+      `Invoice value: ${formatNaira(project.quoted_amount_kobo / 100)}`,
+      `Amount paid: ${formatNaira(totalPaid / 100)}`,
+      `Balance due: ${formatNaira(balance / 100)}`,
+    ]
+      .filter(Boolean)
+      .join('\n')
+    try {
+      if (navigator.share) await navigator.share({ title: `Invoice · ${project.title}`, text })
+      else {
+        await navigator.clipboard.writeText(text)
+        api.success('Invoice summary copied.')
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      api.error('Could not share this invoice.')
+    }
+  }
   return (
     <Drawer
       title={project?.title ?? 'Contract details'}
@@ -315,6 +347,9 @@ export function ProjectDetailsDrawer({
         <Space>
           <Button icon={<PrinterOutlined />} onClick={printInvoice}>
             Print invoice
+          </Button>
+          <Button icon={<ShareAltOutlined />} onClick={() => void shareInvoice()}>
+            Share invoice
           </Button>
           <Button
             type="primary"

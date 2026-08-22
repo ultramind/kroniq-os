@@ -18,6 +18,7 @@ import { CreditPaymentModal } from '../features/sales/CreditPaymentModal'
 import { formatNaira } from '../lib/currency'
 import { supabase } from '../supabase'
 import type { CreditPayment, Sale } from '../types'
+import { ShareContentButton } from '../components/ShareContentButton'
 
 export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefreshSales: () => void }) {
   const [payments, setPayments] = useState<CreditPayment[]>([])
@@ -287,7 +288,14 @@ export function CreditsPage({ sales, onRefreshSales }: { sales: Sale[]; onRefres
         title={`Payment history · ${historySale?.creditCustomerName ?? ''}`}
         footer={
           <div className="flex justify-between">
-            <Button onClick={() => window.print()}>Print history</Button>
+            <div className="flex gap-2">
+              <Button onClick={() => window.print()}>Print history</Button>
+              <ShareContentButton
+                elementId="credit-payment-history"
+                title="Kroniqos credit payment history"
+                label="Share"
+              />
+            </div>
             <Button type="primary" onClick={() => setHistorySale(undefined)}>
               Close
             </Button>

@@ -11,6 +11,7 @@ import { formatNaira } from '../lib/currency'
 import { BulkCsvImportModal, type CsvRow } from '../components/BulkCsvImportModal'
 import { supabase } from '../supabase'
 import { pullProducts, pullSales } from '../sync'
+import { ShareContentButton } from '../components/ShareContentButton'
 
 type Props = {
   recentSales: Sale[]
@@ -188,6 +189,7 @@ export function SalesPage({
             <Button icon={<PrinterOutlined />} onClick={() => window.print()}>
               Print
             </Button>
+            <ShareContentButton elementId="sales-report" title="Kroniqos sales report" label="Share" />
             {role !== 'cashier' && (
               <>
                 <Button icon={<UploadOutlined />} onClick={() => setBulkOpen(true)}>

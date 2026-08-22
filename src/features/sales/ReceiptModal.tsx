@@ -74,8 +74,13 @@ export function ReceiptModal({ sale, items, onClose }: Props) {
         footer={
           <Space>
             <Button onClick={onClose}>Close</Button>
-            <Button icon={<ShareAltOutlined />} onClick={() => void shareReceipt()}>
-              Share receipt
+            <Button
+              icon={<ShareAltOutlined />}
+              aria-label="Share receipt"
+              className="!px-2 sm:!px-4"
+              onClick={() => void shareReceipt()}
+            >
+              <span className="hidden sm:inline">Share receipt</span>
             </Button>
             <Button
               type="primary"
