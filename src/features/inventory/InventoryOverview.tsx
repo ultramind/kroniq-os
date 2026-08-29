@@ -14,7 +14,8 @@ export function InventoryOverview({ products, role, onAdjustProduct, onCountProd
     lowStock?: number
   }
   const lowStockThreshold = Number(savedSettings.lowStock ?? 10)
-  const needsAttention = products.filter(
+  const activeProducts = products.filter((product) => product.active !== false)
+  const needsAttention = activeProducts.filter(
     (product) => product.stock <= (product.lowStockThreshold ?? lowStockThreshold),
   )
   const lowStock = needsAttention.length
@@ -33,7 +34,7 @@ export function InventoryOverview({ products, role, onAdjustProduct, onCountProd
           </div>
           <div className="rounded-xl bg-white/10 px-4 py-2 text-right">
             <p className="mb-0 text-xs text-slate-300">Active products</p>
-            <p className="mb-0 text-2xl font-semibold">{products.length}</p>
+            <p className="mb-0 text-2xl font-semibold">{activeProducts.length}</p>
           </div>
         </div>
       </div>

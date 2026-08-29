@@ -16,6 +16,25 @@ export type ProductDetails = Pick<
   | 'onlinePublished'
   | 'featured'
 >
+
+export type ProductLifecycleAction = 'archive' | 'restore' | 'delete'
+
+export async function manageProductLifecycle(product: Product, action: ProductLifecycleAction) {
+  if (!supabase || !navigator.onLine)
+    throw new Error('Product lifecycle changes require an internet connection.')
+  const { error } = await supabase.rpc('manage_product_lifecycle', {
+    p_product_id: product.id,
+    p_action: action,
+  })
+  if (error) throw error
+  if (action === 'delete') await db.products.delete(product.id)
+  else
+    await db.products.update(product.id, {
+      active: action === 'restore',
+      ...(action === 'archive' ? { onlinePublished: false } : {}),
+    })
+}
+
 export async function updateProductDetails(product: Product, details: ProductDetails) {
   if (supabase) {
     if (!navigator.onLine) throw new Error('Product changes require an internet connection.')
@@ -23,7 +42,7 @@ export async function updateProductDetails(product: Product, details: ProductDet
     const { error } = await supabase.rpc('update_product_details', {
       p_product_id: product.id,
       p_product: {
-        name: details.name,
+        name: details.name.trim().toUpperCase(),
         sku: details.sku,
         price_kobo: Math.round(details.price * 100),
         cost_price_kobo: Math.round(details.costPrice * 100),
@@ -38,5 +57,8 @@ export async function updateProductDetails(product: Product, details: ProductDet
     })
     if (error) throw error
   }
-  await db.products.update(product.id, details)
+  await db.products.update(product.id, {
+    ...details,
+    name: details.name.trim().toUpperCase(),
+  })
 }

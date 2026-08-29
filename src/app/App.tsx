@@ -14,7 +14,7 @@ import { StockAdjustmentModal } from '../features/inventory/StockAdjustmentModal
 import { StockCountModal } from '../features/inventory/StockCountModal'
 import { recordStockAdjustment, recordStockDelivery } from '../features/inventory/inventory.service'
 import { DeliveryModal } from '../features/inventory/DeliveryModal'
-import { updateProductDetails } from '../features/inventory/product.service'
+import { manageProductLifecycle, updateProductDetails } from '../features/inventory/product.service'
 import { CartPanel } from '../features/pos/CartPanel'
 import { saveOfflineSale, type CreditDetails } from '../features/pos/checkout.service'
 import { ReceiptModal } from '../features/sales/ReceiptModal'
@@ -185,7 +185,7 @@ export function App({
   const discount = Math.round(subtotal * state.discountPercent) / 100
   const total = subtotal - discount
   function handleBarcodeLookup(code: string): Product | undefined {
-    const product = products.find((item) => item.sku === code.trim())
+    const product = products.find((item) => item.active !== false && item.sku === code.trim())
     if (!code.trim()) return
     if (!product) {
       if (state.role !== 'cashier') {
@@ -400,7 +400,7 @@ export function App({
       const categoryName = values.category[0]?.trim().replace(/\s+/g, ' ') || 'Uncategorised'
       const product: Product = {
         id: crypto.randomUUID(),
-        name: values.name,
+        name: values.name.trim().toUpperCase(),
         sku: values.sku,
         price: values.price,
         costPrice: values.costPrice,
@@ -553,6 +553,10 @@ export function App({
       api.error(error instanceof Error ? error.message : 'Could not update product.')
     }
   }
+  async function changeProductLifecycle(product: Product, action: 'archive' | 'restore' | 'delete') {
+    await manageProductLifecycle(product, action)
+    await pullProducts()
+  }
   async function reloadCatalogue() {
     const result = await pullProducts()
     if (result.error) {
@@ -661,6 +665,7 @@ export function App({
                   setInventoryOpen(true)
                 }}
                 onSaveProduct={saveProductDetails}
+                onProductLifecycle={changeProductLifecycle}
               />
             }
           />

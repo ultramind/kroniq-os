@@ -236,9 +236,8 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
   const response = await supabase
     .from('products')
     .select(
-      'id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, base_unit, description, image_url, image_urls, online_published, is_featured, categories(name), product_packaging(id,name,units_per_pack,sku,price_kobo,active)',
+      'id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, base_unit, active, description, image_url, image_urls, online_published, is_featured, categories(name), product_packaging(id,name,units_per_pack,sku,price_kobo,active)',
     )
-    .eq('active', true)
     .order('name')
   let data: any[] | null = response.data
   let error = response.error
@@ -251,9 +250,8 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
     const legacy = await supabase
       .from('products')
       .select(
-        'id, name, sku, price_kobo, cost_price_kobo, stock_quantity, low_stock_threshold, description, image_url, online_published, categories(name)',
+        'id, name, sku, price_kobo, cost_price_kobo, stock_quantity, low_stock_threshold, active, description, image_url, online_published, categories(name)',
       )
-      .eq('active', true)
       .order('name')
     data = legacy.data
     error = legacy.error
@@ -263,7 +261,7 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
     const category = Array.isArray(row.categories) ? row.categories[0] : row.categories
     return {
       id: row.id,
-      name: row.name,
+      name: String(row.name ?? '').toUpperCase(),
       sku: row.sku,
       price: row.price_kobo / 100,
       costPrice: (row.cost_price_kobo ?? 0) / 100,
@@ -290,6 +288,7 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
       imageUrls: row.image_urls?.length ? row.image_urls : row.image_url ? [row.image_url] : [],
       onlinePublished: row.online_published ?? false,
       featured: row.is_featured ?? false,
+      active: row.active !== false,
     }
   })
   const cachedCount = await db.products.count()

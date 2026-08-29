@@ -22,6 +22,8 @@ import {
   EditOutlined,
   InboxOutlined,
   PrinterOutlined,
+  StopOutlined,
+  UndoOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
 import JsBarcode from 'jsbarcode'
@@ -47,14 +49,20 @@ type Values = {
   onlinePublished?: boolean
   featured?: boolean
 }
-type Props = { products: Product[]; role: Role; onSave: (product: Product, values: Values) => Promise<void> }
+type Props = {
+  products: Product[]
+  role: Role
+  onSave: (product: Product, values: Values) => Promise<void>
+  onLifecycleChange: (product: Product, action: 'archive' | 'restore' | 'delete') => Promise<void>
+}
 
-export function ProductManagement({ products, role, onSave }: Props) {
+export function ProductManagement({ products, role, onSave, onLifecycleChange }: Props) {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Product>()
   const [packagingProduct, setPackagingProduct] = useState<Product>()
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [lifecycleProductId, setLifecycleProductId] = useState<string>()
   const [form] = Form.useForm<Values>()
   const [api, holder] = message.useMessage()
   const rows = useMemo(
@@ -78,6 +86,24 @@ export function ProductManagement({ products, role, onSave }: Props) {
       setEditing(undefined)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function runLifecycle(product: Product, action: 'archive' | 'restore' | 'delete') {
+    setLifecycleProductId(product.id)
+    try {
+      await onLifecycleChange(product, action)
+      api.success(
+        action === 'delete'
+          ? `${product.name} was permanently deleted.`
+          : action === 'archive'
+            ? `${product.name} was archived and removed from sale.`
+            : `${product.name} was restored for sale.`,
+      )
+    } catch (error) {
+      api.error(error instanceof Error ? error.message : 'Could not update the product.')
+    } finally {
+      setLifecycleProductId(undefined)
     }
   }
 
@@ -198,6 +224,15 @@ export function ProductManagement({ products, role, onSave }: Props) {
       ),
     },
     {
+      title: 'Status',
+      key: 'status',
+      render: (_: unknown, product: Product) => (
+        <Tag color={product.active === false ? 'default' : 'green'}>
+          {product.active === false ? 'Archived' : 'Active'}
+        </Tag>
+      ),
+    },
+    {
       title: '',
       key: 'edit',
       render: (_: unknown, product: Product) =>
@@ -209,6 +244,28 @@ export function ProductManagement({ products, role, onSave }: Props) {
             <Button icon={<EditOutlined />} onClick={() => openEditor(product)}>
               Edit
             </Button>
+            <Button
+              icon={product.active === false ? <UndoOutlined /> : <StopOutlined />}
+              loading={lifecycleProductId === product.id}
+              onClick={() => void runLifecycle(product, product.active === false ? 'restore' : 'archive')}
+            >
+              {product.active === false ? 'Restore' : 'Archive'}
+            </Button>
+            {role === 'admin' && (
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                loading={lifecycleProductId === product.id}
+                onClick={() => {
+                  const confirmed = window.confirm(
+                    `Permanently delete ${product.name}? This only works when it has no sales or inventory history.`,
+                  )
+                  if (confirmed) void runLifecycle(product, 'delete')
+                }}
+              >
+                Delete
+              </Button>
+            )}
           </Space>
         ),
     },
@@ -239,7 +296,12 @@ export function ProductManagement({ products, role, onSave }: Props) {
         className="wide-modal"
       >
         <Form form={form} layout="vertical" onFinish={save}>
-          <Form.Item name="name" label="Product name" rules={[{ required: true }]}>
+          <Form.Item
+            name="name"
+            label="Product name"
+            normalize={(value: string) => value?.toUpperCase()}
+            rules={[{ required: true }]}
+          >
             <Input size="large" />
           </Form.Item>
           <Form.Item

@@ -53,6 +53,7 @@ export function WarehousesPage({ products }: { products: Product[] }) {
     void load()
   }, [])
   const names = new Map(products.map((product) => [product.id, product.name]))
+  const activeProducts = products.filter((product) => product.active !== false)
   const warehouseCount = locations.filter((location) => location.type === 'warehouse').length
   const warehouseUnits = balances
     .filter(
@@ -138,7 +139,7 @@ export function WarehousesPage({ products }: { products: Product[] }) {
         <Card>
           <Statistic
             title="Shop-floor products"
-            value={products.filter((product) => product.stock > 0).length}
+            value={activeProducts.filter((product) => product.stock > 0).length}
           />
         </Card>
       </div>
@@ -200,7 +201,7 @@ export function WarehousesPage({ products }: { products: Product[] }) {
             <Select
               showSearch
               optionFilterProp="label"
-              options={products.map((product) => ({
+              options={activeProducts.map((product) => ({
                 value: product.id,
                 label: `${product.name} (${product.stock} shop floor)`,
               }))}

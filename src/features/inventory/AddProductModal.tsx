@@ -31,6 +31,7 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
   const barcodeInputRef = useRef<InputRef>(null)
   const nameInputRef = useRef<InputRef>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
+  const [categoryOpen, setCategoryOpen] = useState(false)
   useEffect(() => {
     if (!open) {
       form.resetFields()
@@ -128,6 +129,7 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
           <Form.Item
             name="name"
             label="Product name"
+            normalize={(value: string) => value?.toUpperCase()}
             rules={[{ required: true, message: 'Enter the product name' }]}
           >
             <Input ref={nameInputRef} placeholder="e.g. Golden Penny Spaghetti 500g" />
@@ -142,6 +144,9 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
               showSearch
               mode="tags"
               maxCount={1}
+              open={categoryOpen}
+              onDropdownVisibleChange={setCategoryOpen}
+              onSelect={() => setCategoryOpen(false)}
               options={categories.map((category) => ({ value: category, label: category }))}
             />
           </Form.Item>

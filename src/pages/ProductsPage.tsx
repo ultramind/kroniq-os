@@ -9,6 +9,7 @@ export function ProductsPage({
   role,
   onAddProduct,
   onSaveProduct,
+  onProductLifecycle,
 }: {
   products: Product[]
   role: Role
@@ -29,6 +30,7 @@ export function ProductsPage({
       featured?: boolean
     },
   ) => Promise<void>
+  onProductLifecycle: (product: Product, action: 'archive' | 'restore' | 'delete') => Promise<void>
 }) {
   const active = products.filter((product) => product.active !== false)
   const lowStock = active.filter((product) => product.stock <= (product.lowStockThreshold ?? 10)).length
@@ -76,7 +78,12 @@ export function ProductsPage({
           />
         </Card>
       </div>
-      <ProductManagement products={products} role={role} onSave={onSaveProduct} />
+      <ProductManagement
+        products={products}
+        role={role}
+        onSave={onSaveProduct}
+        onLifecycleChange={onProductLifecycle}
+      />
     </div>
   )
 }

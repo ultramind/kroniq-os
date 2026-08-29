@@ -2,6 +2,12 @@ import { InputNumber, type InputNumberProps } from 'antd'
 
 type CurrencyInputProps = InputNumberProps<number>
 
+function parseCurrencyAmount(value?: string) {
+  const cleaned = (value ?? '').replace(/[₦,\s]/g, '').replace(/[^0-9.-]/g, '')
+  const numeric = Number(cleaned)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
 /** A numeric input that groups Naira amounts as they are entered. */
 export function CurrencyInput({ formatter, parser, prefix, onKeyDown, ...props }: CurrencyInputProps) {
   return (
@@ -39,7 +45,7 @@ export function CurrencyInput({ formatter, parser, prefix, onKeyDown, ...props }
           return decimal === undefined ? grouped : `${grouped}.${decimal}`
         })
       }
-      parser={parser ?? ((value) => Number((value ?? '').replace(/[^0-9.-]/g, '')))}
+      parser={parser ?? parseCurrencyAmount}
     />
   )
 }

@@ -39,7 +39,8 @@ export function DeliveryModal({ open, products, saving, onClose, onSave }: Props
   const selectedProductId = Form.useWatch('productId', form)
   const selectedPackageId = Form.useWatch('packageId', form)
   const updateSellingPrice = Form.useWatch('updateSellingPrice', form)
-  const selectedProduct = products.find((product) => product.id === selectedProductId)
+  const activeProducts = products.filter((product) => product.active !== false)
+  const selectedProduct = activeProducts.find((product) => product.id === selectedProductId)
   const selectedPackage = selectedProduct?.packages?.find((pack) => pack.id === selectedPackageId)
   const unitsReceived = selectedPackage?.unitsPerPack ?? 1
   const receivedUnitLabel = selectedPackage?.name ?? selectedProduct?.baseUnit ?? 'unit'
@@ -107,14 +108,14 @@ export function DeliveryModal({ open, products, saving, onClose, onSave }: Props
             showSearch
             optionFilterProp="label"
             onChange={(productId) => {
-              const product = products.find((item) => item.id === productId)
+              const product = activeProducts.find((item) => item.id === productId)
               form.setFieldsValue({
                 sellingPrice: product?.price,
                 updateSellingPrice: false,
                 packageId: undefined,
               })
             }}
-            options={products.map((product) => ({
+            options={activeProducts.map((product) => ({
               value: product.id,
               label: `${product.name} (${product.stock} on shop floor)`,
             }))}
