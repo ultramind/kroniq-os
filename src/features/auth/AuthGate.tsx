@@ -377,16 +377,12 @@ export function AuthGate() {
           )
           const fallbackRoute = data.role === 'cashier' ? '/checkout' : '/'
           const destination =
-            restoringExistingSession &&
-            lastRoute &&
-            isRestorableTenantRoute(lastRoute.split(/[?#]/, 1)[0])
+            restoringExistingSession && lastRoute && isRestorableTenantRoute(lastRoute.split(/[?#]/, 1)[0])
               ? lastRoute
               : fallbackRoute
           // Wait for React to mount the authenticated app before changing
           // routes. This avoids a blank checkout shell immediately after login.
-          window.requestAnimationFrame(() =>
-            navigateRef.current(destination, { replace: true }),
-          )
+          window.requestAnimationFrame(() => navigateRef.current(destination, { replace: true }))
         }
       } catch (error) {
         const {
@@ -480,7 +476,9 @@ export function AuthGate() {
       <CompanyRegistration onBack={() => navigate('/login')} onSignedIn={() => window.location.reload()} />
     )
   if (state.unauthenticated && pathname === '/login')
-    return <Login onRegister={() => navigate('/register')} onForgotPassword={() => navigate('/forgot-password')} />
+    return (
+      <Login onRegister={() => navigate('/register')} onForgotPassword={() => navigate('/forgot-password')} />
+    )
   if (state.unauthenticated && publicMarketingRoute) return <MarketingSite />
   if (state.startupError)
     return (

@@ -156,7 +156,10 @@ export function ResetPassword() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700" htmlFor="kroniq-confirm-password">
+            <label
+              className="mb-1.5 block text-sm font-medium text-zinc-700"
+              htmlFor="kroniq-confirm-password"
+            >
               Confirm new password
             </label>
             <Input.Password
