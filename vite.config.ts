@@ -3,6 +3,28 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (
+            id.includes('/antd/') ||
+            id.includes('/@ant-design/') ||
+            id.includes('/@rc-component/') ||
+            id.includes('/rc-')
+          )
+            return 'antd'
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-router'))
+            return 'react'
+          if (id.includes('/@supabase/')) return 'supabase'
+          if (id.includes('/dexie')) return 'dexie'
+          if (id.includes('/@zxing/')) return 'barcode-scanner'
+          if (id.includes('/jsbarcode/')) return 'barcode-labels'
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

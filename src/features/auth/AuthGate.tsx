@@ -1,18 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Space, Typography, message } from 'antd'
 import { CloudSyncOutlined } from '@ant-design/icons'
 import { supabase, supabaseConfigured } from '../../supabase'
 import type { Role } from '../../types'
-import { App } from '../../app/App'
 import { Login } from './Login'
 import { OrganizationOnboarding } from './OrganizationOnboarding'
 import { CompanyRegistration } from './CompanyRegistration'
 import { migrateLegacyOfflineDatabase, selectOfflineDatabase } from '../../db'
-import { PlatformAccessDenied, PlatformApp } from '../platform/PlatformApp'
-import { BillingPanel } from '../billing/BillingPanel'
-import { MarketingSite } from '../marketing/MarketingSite'
-import { StorefrontPage } from '../../pages/StorefrontPage'
 import { CompanyWorkspacePicker, type CompanyWorkspace } from './CompanyWorkspacePicker'
 import { ForgotPassword, ResetPassword } from './PasswordRecovery'
 import { useTheme } from '../../app/theme'
@@ -31,6 +26,27 @@ import {
   saveCheckoutDraft,
   startCheckoutDraftPersistence,
 } from '../../lib/checkoutDraft'
+
+const App = lazy(() => import('../../app/App').then(({ App }) => ({ default: App })))
+const PlatformApp = lazy(() =>
+  import('../platform/PlatformApp').then(({ PlatformApp }) => ({ default: PlatformApp })),
+)
+const PlatformAccessDenied = lazy(() =>
+  import('../platform/PlatformApp').then(({ PlatformAccessDenied }) => ({ default: PlatformAccessDenied })),
+)
+const BillingPanel = lazy(() =>
+  import('../billing/BillingPanel').then(({ BillingPanel }) => ({ default: BillingPanel })),
+)
+const MarketingSite = lazy(() =>
+  import('../marketing/MarketingSite').then(({ MarketingSite }) => ({ default: MarketingSite })),
+)
+const StorefrontPage = lazy(() =>
+  import('../../pages/StorefrontPage').then(({ StorefrontPage }) => ({ default: StorefrontPage })),
+)
+
+function AppLoading() {
+  return <main className="grid min-h-screen place-items-center text-sm text-zinc-500">Loading Kroniqos…</main>
+}
 
 const lastTenantRouteKey = (userId: string, organizationId: string) =>
   `kroniq-last-tenant-route:${userId}:${organizationId}`
@@ -425,7 +441,12 @@ export function AuthGate() {
     })
     return () => listener.subscription.unsubscribe()
   }, [forgotPasswordRoute, platformRoute, publicStorefrontRoute, resetPasswordRoute])
-  if (publicStorefrontRoute) return <StorefrontPage />
+  if (publicStorefrontRoute)
+    return (
+      <Suspense fallback={<AppLoading />}>
+        <StorefrontPage />
+      </Suspense>
+    )
   if (forgotPasswordRoute) return <ForgotPassword />
   if (resetPasswordRoute) return <ResetPassword />
   if (state.workspaceChoices)
@@ -479,7 +500,12 @@ export function AuthGate() {
     return (
       <Login onRegister={() => navigate('/register')} onForgotPassword={() => navigate('/forgot-password')} />
     )
-  if (state.unauthenticated && publicMarketingRoute) return <MarketingSite />
+  if (state.unauthenticated && publicMarketingRoute)
+    return (
+      <Suspense fallback={<AppLoading />}>
+        <MarketingSite />
+      </Suspense>
+    )
   if (state.startupError)
     return (
       <main className="grid min-h-screen place-items-center p-4">
@@ -494,8 +520,18 @@ export function AuthGate() {
         </Card>
       </main>
     )
-  if (state.platformAdmin) return <PlatformApp />
-  if (state.platformDenied) return <PlatformAccessDenied />
+  if (state.platformAdmin)
+    return (
+      <Suspense fallback={<AppLoading />}>
+        <PlatformApp />
+      </Suspense>
+    )
+  if (state.platformDenied)
+    return (
+      <Suspense fallback={<AppLoading />}>
+        <PlatformAccessDenied />
+      </Suspense>
+    )
   if (state.billingBlocked)
     return (
       <main className="grid min-h-screen place-items-center p-4">
@@ -508,7 +544,11 @@ export function AuthGate() {
                 : 'Please contact your company administrator to restore access.'}
             </p>
           </Card>
-          {state.role === 'admin' && <BillingPanel />}
+          {state.role === 'admin' && (
+            <Suspense fallback={null}>
+              <BillingPanel />
+            </Suspense>
+          )}
         </div>
       </main>
     )
@@ -536,5 +576,9 @@ export function AuthGate() {
         onForgotPassword={() => navigate('/forgot-password')}
       />
     )
-  return <App enforcedRole={state.role} enforcedStaffName={state.staffName} />
+  return (
+    <Suspense fallback={<AppLoading />}>
+      <App enforcedRole={state.role} enforcedStaffName={state.staffName} />
+    </Suspense>
+  )
 }

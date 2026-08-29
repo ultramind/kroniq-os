@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { App as AntApp, message } from 'antd'
@@ -9,38 +9,69 @@ import { supabase } from '../supabase'
 import { usePosStore } from '../store'
 import type { Product, ReceiptItem, Role, Sale, SaleItem, StockMovementReason } from '../types'
 import { AddProductModal, type ProductFormValues } from '../features/inventory/AddProductModal'
-import { InventoryOverview } from '../features/inventory/InventoryOverview'
 import { StockAdjustmentModal } from '../features/inventory/StockAdjustmentModal'
 import { StockCountModal } from '../features/inventory/StockCountModal'
 import { recordStockAdjustment, recordStockDelivery } from '../features/inventory/inventory.service'
 import { DeliveryModal } from '../features/inventory/DeliveryModal'
 import { manageProductLifecycle, updateProductDetails } from '../features/inventory/product.service'
-import { CartPanel } from '../features/pos/CartPanel'
 import { saveOfflineSale, type CreditDetails } from '../features/pos/checkout.service'
 import { ReceiptModal } from '../features/sales/ReceiptModal'
-import { RecentSales } from '../features/sales/RecentSales'
-import { TodaySalesSummary } from '../features/sales/TodaySalesSummary'
 import { returnSaleItems } from '../features/sales/returns.service'
 import { AppShell } from './AppShell'
 import { CheckoutPage } from '../pages/CheckoutPage'
-import { InventoryPage } from '../pages/InventoryPage'
-import { SalesPage } from '../pages/SalesPage'
-import { StaffPage } from '../pages/StaffPage'
-import { ShiftsPage } from '../pages/ShiftsPage'
-import { SettingsPage } from '../pages/SettingsPage'
-import { ReportsPage } from '../pages/ReportsPage'
-import { CreditsPage } from '../pages/CreditsPage'
-import { OrdersPage } from '../pages/OrdersPage'
-import { ProductsPage } from '../pages/ProductsPage'
-import { DeliveriesPage } from '../pages/DeliveriesPage'
-import { ExpensesPage } from '../pages/ExpensesPage'
-import { WarehousesPage } from '../pages/WarehousesPage'
-import { SummaryPage } from '../pages/SummaryPage'
-import { CustomerDisplayPage } from '../pages/CustomerDisplayPage'
-import { StorefrontPage } from '../pages/StorefrontPage'
-import { ServicesPage } from '../pages/ServicesPage'
 import { MaintenanceNoticeBanner } from '../features/support/MaintenanceNoticeBanner'
 import { getStoreSettings, saveStoreSettings } from '../lib/storeSettings'
+
+const InventoryPage = lazy(() =>
+  import('../pages/InventoryPage').then(({ InventoryPage }) => ({ default: InventoryPage })),
+)
+const SalesPage = lazy(() => import('../pages/SalesPage').then(({ SalesPage }) => ({ default: SalesPage })))
+const StaffPage = lazy(() => import('../pages/StaffPage').then(({ StaffPage }) => ({ default: StaffPage })))
+const ShiftsPage = lazy(() =>
+  import('../pages/ShiftsPage').then(({ ShiftsPage }) => ({ default: ShiftsPage })),
+)
+const SettingsPage = lazy(() =>
+  import('../pages/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })),
+)
+const ReportsPage = lazy(() =>
+  import('../pages/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })),
+)
+const CreditsPage = lazy(() =>
+  import('../pages/CreditsPage').then(({ CreditsPage }) => ({ default: CreditsPage })),
+)
+const OrdersPage = lazy(() =>
+  import('../pages/OrdersPage').then(({ OrdersPage }) => ({ default: OrdersPage })),
+)
+const ProductsPage = lazy(() =>
+  import('../pages/ProductsPage').then(({ ProductsPage }) => ({ default: ProductsPage })),
+)
+const DeliveriesPage = lazy(() =>
+  import('../pages/DeliveriesPage').then(({ DeliveriesPage }) => ({ default: DeliveriesPage })),
+)
+const ExpensesPage = lazy(() =>
+  import('../pages/ExpensesPage').then(({ ExpensesPage }) => ({ default: ExpensesPage })),
+)
+const WarehousesPage = lazy(() =>
+  import('../pages/WarehousesPage').then(({ WarehousesPage }) => ({ default: WarehousesPage })),
+)
+const SummaryPage = lazy(() =>
+  import('../pages/SummaryPage').then(({ SummaryPage }) => ({ default: SummaryPage })),
+)
+const CustomerDisplayPage = lazy(() =>
+  import('../pages/CustomerDisplayPage').then(({ CustomerDisplayPage }) => ({
+    default: CustomerDisplayPage,
+  })),
+)
+const StorefrontPage = lazy(() =>
+  import('../pages/StorefrontPage').then(({ StorefrontPage }) => ({ default: StorefrontPage })),
+)
+const ServicesPage = lazy(() =>
+  import('../pages/ServicesPage').then(({ ServicesPage }) => ({ default: ServicesPage })),
+)
+
+function RouteLoading() {
+  return <div className="grid min-h-[240px] place-items-center text-sm text-zinc-500">Loading page…</div>
+}
 
 export function App({
   enforcedRole,
@@ -566,8 +597,18 @@ export function App({
       api.success('Catalogue reloaded. Pending sales and returns were kept.')
     }
   }
-  if (pathname === '/customer-display') return <CustomerDisplayPage />
-  if (pathname.startsWith('/shop/')) return <StorefrontPage />
+  if (pathname === '/customer-display')
+    return (
+      <Suspense fallback={<RouteLoading />}>
+        <CustomerDisplayPage />
+      </Suspense>
+    )
+  if (pathname.startsWith('/shop/'))
+    return (
+      <Suspense fallback={<RouteLoading />}>
+        <StorefrontPage />
+      </Suspense>
+    )
   return (
     <AppShell
       role={state.role}
@@ -579,121 +620,131 @@ export function App({
       {contextHolder}
       <MaintenanceNoticeBanner />
       <div className="mx-auto max-w-7xl">
-        <Routes>
-          <Route path="/settings" element={<SettingsPage role={state.role} />} />
-          <Route
-            path="/"
-            element={
-              <SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />
-            }
-          />
-          <Route
-            path="/summary"
-            element={
-              <SummaryPage sales={allSales} role={enforcedRole ?? state.role} staffName={enforcedStaffName} />
-            }
-          />
-          <Route path="/services" element={<ServicesPage />} />
-          <Route
-            path="/checkout"
-            element={
-              <CheckoutPage
-                products={visibleProducts}
-                search={state.search}
-                cart={state.cart}
-                total={total}
-                role={enforcedRole ?? state.role}
-                flexiblePricingEnabled={flexiblePricingEnabled}
-                paymentMethod={state.paymentMethod}
-                orderOnly={orderCheckoutOnly}
-                onSearchChange={state.setSearch}
-                onBarcodeLookup={handleBarcodeLookup}
-                onQuantityChange={state.updateQuantity}
-                onUnitPriceChange={state.updateUnitPrice}
-                onPaymentChange={state.setPaymentMethod}
-                onCheckout={(credit) => void checkout(credit)}
-                onHistoricalCheckout={(credit, saleDate, deductStock) =>
-                  void recordHistoricalSale(credit, saleDate, deductStock)
-                }
-                historicalSaving={savingHistoricalSale}
-                checkoutSaving={savingCheckout}
-              />
-            }
-          />
-          <Route
-            path="/shifts"
-            element={<ShiftsPage activeShift={activeShift} onChanged={() => undefined} />}
-          />
-          <Route
-            path="/sales"
-            element={
-              <SalesPage
-                recentSales={recentSales}
-                allSales={allSales}
-                returnActivities={returnActivities}
-                role={state.role}
-                onViewReceipt={(sale) => void viewReceipt(sale)}
-                onReturnSale={(sale, selected) => void processReturn(sale, selected)}
-                onRetryStockConflict={retryStockConflict}
-              />
-            }
-          />
-          <Route path="/reports" element={<ReportsPage sales={allSales} role={state.role} />} />
-          <Route
-            path="/credits"
-            element={<CreditsPage sales={allSales} onRefreshSales={() => void pullSales()} />}
-          />
-          <Route
-            path="/orders"
-            element={
-              <OrdersPage
-                sales={allSales}
-                onRefreshSales={() => void pullSales()}
-                onViewReceipt={(sale) => void viewReceipt(sale)}
-              />
-            }
-          />
-          <Route path="/expenses" element={<ExpensesPage />} />
-          <Route
-            path="/products"
-            element={
-              <ProductsPage
-                products={products}
-                role={state.role}
-                onAddProduct={() => {
-                  setNewProductBarcode(undefined)
-                  setInventoryOpen(true)
-                }}
-                onSaveProduct={saveProductDetails}
-                onProductLifecycle={changeProductLifecycle}
-              />
-            }
-          />
-          <Route
-            path="/deliveries"
-            element={
-              <DeliveriesPage
-                products={products}
-                deliveries={deliveries}
-                onReceiveDelivery={() => setDeliveryOpen(true)}
-              />
-            }
-          />
-          <Route path="/warehouses" element={<WarehousesPage products={products} />} />
-          <Route
-            path="/inventory"
-            element={
-              <InventoryPage
-                products={products}
-                movements={movements}
-                role={state.role}
-                onAdjustProduct={setAdjustingProduct}
-                onCountProduct={setCountingProduct}
-              />
-            }
-          />
-          <Route path="/staff" element={<StaffPage role={state.role} />} />
-        </Routes>
+        <Suspense fallback={<RouteLoading />}>
+          <Routes>
+            <Route path="/settings" element={<SettingsPage role={state.role} />} />
+            <Route
+              path="/"
+              element={
+                <SummaryPage
+                  sales={allSales}
+                  role={enforcedRole ?? state.role}
+                  staffName={enforcedStaffName}
+                />
+              }
+            />
+            <Route
+              path="/summary"
+              element={
+                <SummaryPage
+                  sales={allSales}
+                  role={enforcedRole ?? state.role}
+                  staffName={enforcedStaffName}
+                />
+              }
+            />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route
+              path="/checkout"
+              element={
+                <CheckoutPage
+                  products={visibleProducts}
+                  search={state.search}
+                  cart={state.cart}
+                  total={total}
+                  role={enforcedRole ?? state.role}
+                  flexiblePricingEnabled={flexiblePricingEnabled}
+                  paymentMethod={state.paymentMethod}
+                  orderOnly={orderCheckoutOnly}
+                  onSearchChange={state.setSearch}
+                  onBarcodeLookup={handleBarcodeLookup}
+                  onQuantityChange={state.updateQuantity}
+                  onUnitPriceChange={state.updateUnitPrice}
+                  onPaymentChange={state.setPaymentMethod}
+                  onCheckout={(credit) => void checkout(credit)}
+                  onHistoricalCheckout={(credit, saleDate, deductStock) =>
+                    void recordHistoricalSale(credit, saleDate, deductStock)
+                  }
+                  historicalSaving={savingHistoricalSale}
+                  checkoutSaving={savingCheckout}
+                />
+              }
+            />
+            <Route
+              path="/shifts"
+              element={<ShiftsPage activeShift={activeShift} onChanged={() => undefined} />}
+            />
+            <Route
+              path="/sales"
+              element={
+                <SalesPage
+                  recentSales={recentSales}
+                  allSales={allSales}
+                  returnActivities={returnActivities}
+                  role={state.role}
+                  onViewReceipt={(sale) => void viewReceipt(sale)}
+                  onReturnSale={(sale, selected) => void processReturn(sale, selected)}
+                  onRetryStockConflict={retryStockConflict}
+                />
+              }
+            />
+            <Route path="/reports" element={<ReportsPage sales={allSales} role={state.role} />} />
+            <Route
+              path="/credits"
+              element={<CreditsPage sales={allSales} onRefreshSales={() => void pullSales()} />}
+            />
+            <Route
+              path="/orders"
+              element={
+                <OrdersPage
+                  sales={allSales}
+                  onRefreshSales={() => void pullSales()}
+                  onViewReceipt={(sale) => void viewReceipt(sale)}
+                />
+              }
+            />
+            <Route path="/expenses" element={<ExpensesPage />} />
+            <Route
+              path="/products"
+              element={
+                <ProductsPage
+                  products={products}
+                  role={state.role}
+                  onAddProduct={() => {
+                    setNewProductBarcode(undefined)
+                    setInventoryOpen(true)
+                  }}
+                  onSaveProduct={saveProductDetails}
+                  onProductLifecycle={changeProductLifecycle}
+                />
+              }
+            />
+            <Route
+              path="/deliveries"
+              element={
+                <DeliveriesPage
+                  products={products}
+                  deliveries={deliveries}
+                  onReceiveDelivery={() => setDeliveryOpen(true)}
+                />
+              }
+            />
+            <Route path="/warehouses" element={<WarehousesPage products={products} />} />
+            <Route
+              path="/inventory"
+              element={
+                <InventoryPage
+                  products={products}
+                  movements={movements}
+                  role={state.role}
+                  onAdjustProduct={setAdjustingProduct}
+                  onCountProduct={setCountingProduct}
+                />
+              }
+            />
+            <Route path="/staff" element={<StaffPage role={state.role} />} />
+          </Routes>
+        </Suspense>
       </div>
       <AddProductModal
         open={inventoryOpen}
