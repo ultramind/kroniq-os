@@ -29,7 +29,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pos-icon.svg'],
+      includeAssets: ['pos-icon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Kroniqos',
         short_name: 'Kroniqos',
@@ -38,7 +38,11 @@ export default defineConfig({
         background_color: '#fafafa',
         display: 'standalone',
         start_url: '/',
-        icons: [{ src: 'pos-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [
+          { src: 'icons/kroniqos-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: 'icons/kroniqos-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: 'pos-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        ],
       },
       workbox: {
         navigateFallback: '/index.html',

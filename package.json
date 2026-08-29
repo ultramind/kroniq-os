@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "generate:pwa-icons": "node scripts/generate-pwa-icons.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"supabase/functions/**/*.ts\" \"*.{json,js,ts,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"supabase/functions/**/*.ts\" \"*.{json,js,ts,css}\"",
     "preview": "vite preview"
