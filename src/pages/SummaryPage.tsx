@@ -15,6 +15,7 @@ type RemoteExpense = { id: string; amount: number; spentAt: string; description:
 type RemotePayment = { id: string; amount: number; paidAt: string }
 type RemoteOrderPayment = { saleId: string; amount: number }
 type RemoteDelivery = { id: string; value: number; receivedAt: string }
+const businessDate = (value: string) => dayjs(value).format('YYYY-MM-DD')
 function rangeFor(period: Period, anchor: string) {
   const date = new Date(`${anchor}T12:00:00`)
   const start = new Date(date)
@@ -143,8 +144,8 @@ export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: R
     () =>
       sales.filter(
         (sale) =>
-          sale.createdAt.slice(0, 10) >= start &&
-          sale.createdAt.slice(0, 10) <= end &&
+          businessDate(sale.createdAt) >= start &&
+          businessDate(sale.createdAt) <= end &&
           sale.status !== 'returned' &&
           (sale.paymentMethod !== 'order' || sale.orderStatus === 'fulfilled'),
       ),
@@ -157,8 +158,8 @@ export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: R
         (sale) =>
           sale.paymentMethod === 'order' &&
           sale.status !== 'returned' &&
-          sale.createdAt.slice(0, 10) >= start &&
-          sale.createdAt.slice(0, 10) <= end,
+          businessDate(sale.createdAt) >= start &&
+          businessDate(sale.createdAt) <= end,
       ),
     [end, sales, start],
   )
@@ -200,11 +201,11 @@ export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: R
   const creditCollected = payments.reduce((sum, payment) => sum + payment.amount, 0)
   const deliveryValue = deliveries.reduce((sum, delivery) => sum + delivery.value, 0)
   const returnTotal = returns
-    .filter((item) => item.createdAt.slice(0, 10) >= start && item.createdAt.slice(0, 10) <= end)
+    .filter((item) => businessDate(item.createdAt) >= start && businessDate(item.createdAt) <= end)
     .reduce((sum, item) => sum + item.total, 0)
   const cashVariance = shifts
     .filter((shift) => {
-      const closedDate = shift.closedAt?.slice(0, 10) ?? ''
+      const closedDate = shift.closedAt ? businessDate(shift.closedAt) : ''
       return closedDate >= start && closedDate <= end
     })
     .reduce((sum, shift) => sum + (shift.variance ?? 0), 0)

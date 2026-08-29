@@ -1,7 +1,7 @@
 import { ArrowLeftOutlined, ArrowRightOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
 import { Alert, Button, Input, Typography, message } from 'antd'
 import { useEffect, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabase'
 
 const { Title, Text } = Typography
@@ -79,20 +79,39 @@ export function ForgotPassword() {
 
 export function ResetPassword() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
+  const [recoveryError, setRecoveryError] = useState<string>()
   const [api, holder] = message.useMessage()
 
   useEffect(() => {
     if (!supabase) return
-    void supabase.auth.getSession().then(({ data }) => setReady(Boolean(data.session)))
+    void (async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        setReady(true)
+        return
+      }
+      // PKCE recovery links arrive with a one-time code in the query string.
+      // Exchange it here when the client has not already done so automatically.
+      const code = new URLSearchParams(location.search).get('code')
+      if (!code) return
+      const { data: exchanged, error } = await supabase.auth.exchangeCodeForSession(code)
+      if (error) {
+        setRecoveryError(error.message)
+        return
+      }
+      setReady(Boolean(exchanged.session))
+      window.history.replaceState({}, document.title, location.pathname)
+    })()
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(Boolean(session))
     })
     return () => listener.subscription.unsubscribe()
-  }, [])
+  }, [location.pathname, location.search])
 
   async function submit() {
     if (!supabase) return
@@ -133,7 +152,10 @@ export function ResetPassword() {
           type="warning"
           showIcon
           message="Open the reset link from your email"
-          description="This page needs a valid password-reset link. Request a new one if the link has expired."
+          description={
+            recoveryError ??
+            'This page needs a valid password-reset link. Request a new one if the link has expired.'
+          }
           action={
             <Button size="small" onClick={() => navigate('/forgot-password')}>
               Request link

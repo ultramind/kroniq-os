@@ -29,6 +29,7 @@ type ExpenseRow = { id: string; category: string; description: string; amount: n
 type PaymentRow = { saleId: string; amount: number }
 
 const paymentLabel = (method: string) => (method === 'card' ? 'Card / POS' : method.replace('_', ' '))
+const businessDate = (value: string) => dayjs(value).format('YYYY-MM-DD')
 
 function datesFor(period: Period, anchor: Dayjs, custom: [Dayjs, Dayjs] | null) {
   if (period === 'custom' && custom)
@@ -131,8 +132,8 @@ export function ReportsPage({ sales, role }: { sales: Sale[]; role: Role }) {
     () =>
       sales.filter(
         (sale) =>
-          sale.createdAt.slice(0, 10) >= start &&
-          sale.createdAt.slice(0, 10) <= end &&
+          businessDate(sale.createdAt) >= start &&
+          businessDate(sale.createdAt) <= end &&
           (paymentMethod === 'all' || sale.paymentMethod === paymentMethod) &&
           (cashier === 'all' || sale.cashier === cashier),
       ),
@@ -288,7 +289,9 @@ export function ReportsPage({ sales, role }: { sales: Sale[]; role: Role }) {
   }, [expenses])
   const cashVariance = shifts
     .filter(
-      (shift) => (shift.closedAt?.slice(0, 10) ?? '') >= start && (shift.closedAt?.slice(0, 10) ?? '') <= end,
+      (shift) =>
+        (shift.closedAt ? businessDate(shift.closedAt) : '') >= start &&
+        (shift.closedAt ? businessDate(shift.closedAt) : '') <= end,
     )
     .reduce((total, shift) => total + (shift.variance ?? 0), 0)
   const maxPayment = Math.max(1, ...paymentRows.map((row) => row.total))
@@ -490,7 +493,9 @@ export function ReportsPage({ sales, role }: { sales: Sale[]; role: Role }) {
               scroll={{ x: 660 }}
               pagination={{ pageSize: 8 }}
               dataSource={movements
-                .filter((item) => item.createdAt.slice(0, 10) >= start && item.createdAt.slice(0, 10) <= end)
+                .filter(
+                  (item) => businessDate(item.createdAt) >= start && businessDate(item.createdAt) <= end,
+                )
                 .sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
               columns={[
                 {

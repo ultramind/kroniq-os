@@ -71,7 +71,12 @@ export function AuthGate() {
   const navigate = useNavigate()
   const platformRoute = pathname.startsWith('/platform')
   const forgotPasswordRoute = pathname === '/forgot-password'
-  const resetPasswordRoute = pathname === '/reset-password'
+  const recoverySearch = new URLSearchParams(search)
+  const recoveryHash = new URLSearchParams(hash.replace(/^#/, ''))
+  const resetPasswordRoute =
+    pathname === '/reset-password' ||
+    recoverySearch.get('type') === 'recovery' ||
+    recoveryHash.get('type') === 'recovery'
   const publicStorefrontRoute = pathname.startsWith('/shop/')
   const publicMarketingRoute =
     pathname === '/' ||
@@ -423,6 +428,15 @@ export function AuthGate() {
     }
     void load()
     const { data: listener } = client.auth.onAuthStateChange((event) => {
+      // Recovery links can briefly look like an ordinary signed-in session.
+      // Always route them to the password screen before workspace selection.
+      if (event === 'PASSWORD_RECOVERY') {
+        setState({ loading: false })
+        navigateRef.current(`/reset-password${window.location.search}${window.location.hash}`, {
+          replace: true,
+        })
+        return
+      }
       // Supabase refreshes tokens when a tab regains focus. The session remains
       // valid, so this must stay in the background instead of remounting the
       // entire workspace behind the startup loader.

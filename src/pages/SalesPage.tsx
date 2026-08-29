@@ -25,6 +25,8 @@ type Props = {
 
 type Period = 'day' | 'week' | 'month' | 'year'
 
+const businessDate = (value: string) => dayjs(value).format('YYYY-MM-DD')
+
 function rangeFor(period: Period, anchor: string) {
   const date = dayjs(anchor)
   if (period === 'week') {
@@ -57,8 +59,8 @@ export function SalesPage({
       allSales.filter(
         (sale) =>
           (method === 'all' || sale.paymentMethod === method) &&
-          sale.createdAt.slice(0, 10) >= start.format('YYYY-MM-DD') &&
-          sale.createdAt.slice(0, 10) <= end.format('YYYY-MM-DD'),
+          businessDate(sale.createdAt) >= start.format('YYYY-MM-DD') &&
+          businessDate(sale.createdAt) <= end.format('YYYY-MM-DD'),
       ),
     [allSales, method, start, end],
   )

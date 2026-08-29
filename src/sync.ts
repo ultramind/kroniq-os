@@ -306,17 +306,24 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
 /** Pulls completed sales created by any terminal in this store into the local dashboard cache. */
 export async function pullSales(): Promise<{ loaded: number; error?: string }> {
   if (!supabase || !navigator.onLine) return { loaded: 0 }
-  const { data, error } = await supabase
-    .from('sales')
-    .select(
-      'id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, order_status, order_notes, order_cost_kobo, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, products(name))',
-    )
-    .order('sold_at', { ascending: false })
-    .limit(500)
-  if (error) return { loaded: 0, error: error.message }
+  const pageSize = 500
+  const maximumCachedSales = 5000
+  const data: any[] = []
+  for (let offset = 0; offset < maximumCachedSales; offset += pageSize) {
+    const response = await supabase
+      .from('sales')
+      .select(
+        'id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, order_status, order_notes, order_cost_kobo, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, products(name))',
+      )
+      .order('sold_at', { ascending: false })
+      .range(offset, offset + pageSize - 1)
+    if (response.error) return { loaded: 0, error: response.error.message }
+    data.push(...(response.data ?? []))
+    if ((response.data ?? []).length < pageSize) break
+  }
 
   await db.transaction('rw', db.sales, db.saleItems, async () => {
-    for (const row of data ?? []) {
+    for (const row of data) {
       const existing = await db.sales.get(row.id)
       if (existing && !existing.synced) continue
       await db.sales.put({
@@ -362,7 +369,7 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
       }
     }
   })
-  return { loaded: data?.length ?? 0 }
+  return { loaded: data.length }
 }
 
 /** Loads the supplier delivery register from Supabase for the inventory operations page. */
