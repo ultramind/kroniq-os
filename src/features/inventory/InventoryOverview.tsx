@@ -60,7 +60,18 @@ export function InventoryOverview({ products, role, onAdjustProduct, onCountProd
             </Text>
             <List
               size="small"
-              dataSource={needsAttention.slice(0, 4)}
+              dataSource={needsAttention}
+              pagination={
+                needsAttention.length > 10
+                  ? {
+                      pageSize: 10,
+                      size: 'small',
+                      showSizeChanger: false,
+                      position: 'bottom',
+                      align: 'end',
+                    }
+                  : false
+              }
               locale={{ emptyText: 'All products are above their alert quantities.' }}
               renderItem={(product) => (
                 <List.Item

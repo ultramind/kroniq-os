@@ -1,5 +1,5 @@
 import { ScanOutlined } from '@ant-design/icons'
-import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
+import { BarcodeFormat, BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 import { Alert, Button, Modal, Space, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 
@@ -30,24 +30,52 @@ export function CameraBarcodeScannerModal({ open, onClose, onScan }: Props) {
         }
         const video = videoRef.current
         if (!video) throw new Error('Camera preview is not ready yet.')
-        const reader = new BrowserMultiFormatReader()
-        controls = await reader.decodeFromConstraints(
-          {
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-            audio: false,
+        const reader = new BrowserMultiFormatReader(undefined, {
+          delayBetweenScanAttempts: 80,
+          tryPlayVideoTimeout: 6000,
+        })
+        // Narrow the scan formats to the barcodes retailers commonly use. This
+        // makes mobile cameras noticeably quicker than trying every 1D/2D type.
+        reader.possibleFormats = [
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39,
+          BarcodeFormat.CODE_93,
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.ITF,
+          BarcodeFormat.CODABAR,
+          BarcodeFormat.QR_CODE,
+        ]
+        const onResult = (result: { getText: () => string } | undefined) => {
+          if (!result || scanned || cancelled) return
+          scanned = true
+          onScan(result.getText())
+          onClose()
+        }
+        const primaryConstraints: MediaStreamConstraints = {
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
-          video,
-          (result) => {
-            if (!result || scanned || cancelled) return
-            scanned = true
-            onScan(result.getText())
-            onClose()
-          },
-        )
+          audio: false,
+        }
+        try {
+          controls = await reader.decodeFromConstraints(primaryConstraints, video, onResult)
+        } catch (primaryError) {
+          // Some mobile WebViews reject camera preference constraints even
+          // though they can still open a camera. Retry with the browser default.
+          if (
+            primaryError instanceof DOMException &&
+            ['OverconstrainedError', 'NotFoundError'].includes(primaryError.name)
+          ) {
+            controls = await reader.decodeFromConstraints({ video: true, audio: false }, video, onResult)
+          } else {
+            throw primaryError
+          }
+        }
         if (cancelled) controls.stop()
       } catch (cause) {
         if (!cancelled) {
@@ -61,9 +89,9 @@ export function CameraBarcodeScannerModal({ open, onClose, onScan }: Props) {
       }
     }
 
-    // Defer one frame so the Ant Design modal has mounted its video element.
+    // Let the mobile modal finish its open transition before attaching the stream.
     // It also prevents React Strict Mode from opening two camera streams in development.
-    startTimer = window.setTimeout(() => void startCamera(), 0)
+    startTimer = window.setTimeout(() => void startCamera(), 180)
 
     return () => {
       cancelled = true

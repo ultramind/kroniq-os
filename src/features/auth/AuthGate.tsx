@@ -32,9 +32,26 @@ import {
   startCheckoutDraftPersistence,
 } from '../../lib/checkoutDraft'
 
+const lastTenantRouteKey = (userId: string, organizationId: string) =>
+  `kroniq-last-tenant-route:${userId}:${organizationId}`
+
+function isRestorableTenantRoute(pathname: string) {
+  return (
+    pathname !== '/login' &&
+    pathname !== '/register' &&
+    pathname !== '/onboarding' &&
+    !pathname.startsWith('/platform') &&
+    !pathname.startsWith('/shop/') &&
+    !pathname.startsWith('/solutions/') &&
+    !['/product', '/pricing', '/about', '/contact', '/help', '/privacy', '/terms', '/status'].includes(
+      pathname,
+    )
+  )
+}
+
 export function AuthGate() {
   const { mode } = useTheme()
-  const { pathname } = useLocation()
+  const { pathname, search, hash } = useLocation()
   const navigate = useNavigate()
   const platformRoute = pathname.startsWith('/platform')
   const forgotPasswordRoute = pathname === '/forgot-password'
@@ -73,6 +90,15 @@ export function AuthGate() {
   const stopCheckoutDraftPersistence = useRef<(() => void) | undefined>(undefined)
   const checkoutDraftWorkspace = useRef<{ userId: string; organizationId: string } | undefined>(undefined)
   navigateRef.current = navigate
+  useEffect(() => {
+    if (state.loading || !state.role || !isRestorableTenantRoute(pathname)) return
+    const workspace = getStoredOfflineWorkspace()
+    if (!workspace?.organizationId) return
+    sessionStorage.setItem(
+      lastTenantRouteKey(workspace.userId, workspace.organizationId),
+      `${pathname}${search}${hash}`,
+    )
+  }, [hash, pathname, search, state.loading, state.role])
   function resetTenantUiState() {
     const workspace = checkoutDraftWorkspace.current
     if (workspace) {
@@ -343,12 +369,23 @@ export function AuthGate() {
           redirectToDefault || pathname === '/login' || pathname === '/register'
         setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
         if (shouldRedirectToWorkspace) {
+          const restoringExistingSession = redirectToDefault && !wasUnauthenticated.current
           wasUnauthenticated.current = false
           message.success('Logged in successfully.')
+          const lastRoute = sessionStorage.getItem(
+            lastTenantRouteKey(session.user.id, activeWorkspace.organizationId),
+          )
+          const fallbackRoute = data.role === 'cashier' ? '/checkout' : '/'
+          const destination =
+            restoringExistingSession &&
+            lastRoute &&
+            isRestorableTenantRoute(lastRoute.split(/[?#]/, 1)[0])
+              ? lastRoute
+              : fallbackRoute
           // Wait for React to mount the authenticated app before changing
           // routes. This avoids a blank checkout shell immediately after login.
           window.requestAnimationFrame(() =>
-            navigateRef.current(data.role === 'cashier' ? '/checkout' : '/', { replace: true }),
+            navigateRef.current(destination, { replace: true }),
           )
         }
       } catch (error) {
@@ -385,6 +422,8 @@ export function AuthGate() {
         const workspace = getStoredOfflineWorkspace()
         if (workspace?.userId) sessionStorage.removeItem(`kroniq-active-organization:${workspace.userId}`)
         if (workspace?.userId) sessionStorage.removeItem(`kroniq-workspace-selected:${workspace.userId}`)
+        if (workspace?.userId && workspace.organizationId)
+          sessionStorage.removeItem(lastTenantRouteKey(workspace.userId, workspace.organizationId))
       }
       void load(event === 'SIGNED_IN')
     })

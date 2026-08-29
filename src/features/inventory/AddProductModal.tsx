@@ -100,8 +100,14 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
               placeholder="Scan barcode or type SKU"
               onPressEnter={() => nameInputRef.current?.focus()}
               addonAfter={
-                <Button type="text" size="small" icon={<BarcodeOutlined />} onClick={generateBarcode}>
-                  Generate
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<BarcodeOutlined />}
+                  aria-label="Generate barcode"
+                  onClick={generateBarcode}
+                >
+                  <span className="hidden sm:inline">Generate</span>
                 </Button>
               }
             />

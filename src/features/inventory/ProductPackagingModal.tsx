@@ -8,7 +8,7 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import type { Product, ProductPackage } from '../../types'
 
 type Values = { name: string; unitsPerPack: number; sku?: string; price: number }
-const units = ['piece', 'bottle', 'can', 'sachet', 'bag', 'roll', 'kg', 'litre']
+const units = ['piece', 'bottle', 'can', 'sachet', 'bag', 'roll', 'ml', 'litre', 'kg']
 
 export function ProductPackagingModal({
   product,
