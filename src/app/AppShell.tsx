@@ -508,7 +508,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
         </Footer>
       </Layout>
       {retailEnabled && pathname !== '/checkout' && (
-        <div className="fixed right-0 top-16 z-30 lg:hidden">
+        <div className="mobile-cart-trigger fixed z-40 lg:hidden">
           <Badge
             count={cartItemCount}
             size="small"
@@ -517,7 +517,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
             <Button
               type="primary"
               aria-label="Open current sale"
-              className="!h-[46px] !w-[46px] !rounded-l !rounded-r-none !p-0"
+              className="!h-[52px] !w-[52px] !rounded-full !p-0"
               icon={<ShoppingCartOutlined />}
               onClick={() => navigate('/checkout?cart=1')}
             />

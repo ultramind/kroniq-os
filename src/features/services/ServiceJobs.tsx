@@ -254,8 +254,27 @@ export function ServiceJobs() {
           rowKey="id"
           dataSource={projects}
           columns={[
-            { title: 'Contract', dataIndex: 'title' },
-            { title: 'Client', render: (_, p: Project) => clientName(p.customer) ?? '—' },
+            {
+              title: 'Contract',
+              dataIndex: 'title',
+              render: (title: string, project: Project) => (
+                <Button
+                  type="link"
+                  className="!h-auto !px-0 !font-medium"
+                  onClick={() => setDetailsProjectId(project.id)}
+                >
+                  {title}
+                </Button>
+              ),
+            },
+            {
+              title: 'Client',
+              render: (_, project: Project) => (
+                <Button type="link" className="!h-auto !px-0" onClick={() => setDetailsProjectId(project.id)}>
+                  {clientName(project.customer) ?? '—'}
+                </Button>
+              ),
+            },
             { title: 'Value', dataIndex: 'quoted_amount_kobo', render: (v: number) => formatNaira(v / 100) },
             {
               title: 'Paid',
@@ -286,6 +305,7 @@ export function ServiceJobs() {
               ),
             },
           ]}
+          scroll={{ x: 900 }}
         />
       </Card>
       <Modal

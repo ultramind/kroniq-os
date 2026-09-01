@@ -9,6 +9,7 @@ export type ProductDetails = Pick<
   | 'price'
   | 'costPrice'
   | 'minimumSellingPrice'
+  | 'lowStockThreshold'
   | 'active'
   | 'description'
   | 'imageUrl'
@@ -48,6 +49,7 @@ export async function updateProductDetails(product: Product, details: ProductDet
         cost_price_kobo: Math.round(details.costPrice * 100),
         minimum_selling_price_kobo:
           details.minimumSellingPrice === undefined ? null : Math.round(details.minimumSellingPrice * 100),
+        low_stock_threshold: details.lowStockThreshold,
         active: details.active ?? true,
         description: details.description ?? null,
         image_urls: imageUrls,

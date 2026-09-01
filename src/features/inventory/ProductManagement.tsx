@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   Button,
   Card,
+  Dropdown,
   Form,
   Image,
   Input,
@@ -21,12 +22,14 @@ import {
   DeleteOutlined,
   EditOutlined,
   InboxOutlined,
+  MoreOutlined,
   PrinterOutlined,
   StopOutlined,
   UndoOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
 import JsBarcode from 'jsbarcode'
+import type { ColumnsType } from 'antd/es/table'
 import { formatNaira } from '../../lib/currency'
 import { supabase } from '../../supabase'
 import type { Product, Role } from '../../types'
@@ -42,6 +45,7 @@ type Values = {
   price: number
   costPrice: number
   minimumSellingPrice?: number
+  lowStockThreshold: number
   active: boolean
   description?: string
   imageUrl?: string
@@ -148,6 +152,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
       price: product.price,
       costPrice: product.costPrice,
       minimumSellingPrice: product.minimumSellingPrice,
+      lowStockThreshold: product.lowStockThreshold ?? 10,
       active: product.active !== false,
       description: product.description,
       imageUrls: product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : [],
@@ -177,7 +182,88 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
     popup.document.close()
   }
 
-  const columns = [
+  function confirmDelete(product: Product) {
+    const confirmed = window.confirm(
+      `Permanently delete ${product.name}? This only works when it has no sales or inventory history.`,
+    )
+    if (confirmed) void runLifecycle(product, 'delete')
+  }
+
+  const desktopActions = (product: Product) => (
+    <Space wrap>
+      <Button icon={<InboxOutlined />} onClick={() => setPackagingProduct(product)}>
+        Packs
+      </Button>
+      <Button icon={<EditOutlined />} onClick={() => openEditor(product)}>
+        Edit
+      </Button>
+      <Button
+        icon={product.active === false ? <UndoOutlined /> : <StopOutlined />}
+        loading={lifecycleProductId === product.id}
+        onClick={() => void runLifecycle(product, product.active === false ? 'restore' : 'archive')}
+      >
+        {product.active === false ? 'Restore' : 'Archive'}
+      </Button>
+      {role === 'admin' && (
+        <Button
+          danger
+          icon={<DeleteOutlined />}
+          loading={lifecycleProductId === product.id}
+          onClick={() => confirmDelete(product)}
+        >
+          Delete
+        </Button>
+      )}
+    </Space>
+  )
+
+  const columns: ColumnsType<Product> = [
+    ...(role !== 'cashier'
+      ? [
+          {
+            title: '',
+            key: 'mobile-actions',
+            width: 52,
+            responsive: ['xs'] as Array<'xs'>,
+            render: (_: unknown, product: Product) => (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    { key: 'packs', label: 'Manage packs', icon: <InboxOutlined /> },
+                    { key: 'edit', label: 'Edit product', icon: <EditOutlined /> },
+                    {
+                      key: 'archive',
+                      label: product.active === false ? 'Restore product' : 'Archive product',
+                      icon: product.active === false ? <UndoOutlined /> : <StopOutlined />,
+                    },
+                    ...(role === 'admin'
+                      ? [
+                          { type: 'divider' as const },
+                          { key: 'delete', label: 'Delete product', danger: true, icon: <DeleteOutlined /> },
+                        ]
+                      : []),
+                  ],
+                  onClick: ({ key }) => {
+                    if (key === 'packs') setPackagingProduct(product)
+                    if (key === 'edit') openEditor(product)
+                    if (key === 'archive')
+                      void runLifecycle(product, product.active === false ? 'restore' : 'archive')
+                    if (key === 'delete') confirmDelete(product)
+                  },
+                }}
+              >
+                <Button
+                  type="text"
+                  shape="circle"
+                  icon={<MoreOutlined />}
+                  aria-label={`Actions for ${product.name}`}
+                />
+              </Dropdown>
+            ),
+          },
+        ]
+      : []),
     {
       title: 'Product',
       dataIndex: 'name',
@@ -196,6 +282,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
       title: 'Selling price',
       dataIndex: 'price',
       key: 'price',
+      responsive: ['sm'] as Array<'sm'>,
       render: (price: number, product: Product) => (
         <div>
           {formatNaira(price)}
@@ -217,6 +304,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
     {
       title: 'Online',
       key: 'online',
+      responsive: ['md'] as Array<'md'>,
       render: (_: unknown, product: Product) => (
         <Tag color={product.onlinePublished ? 'green' : 'default'}>
           {product.onlinePublished ? 'Published' : 'Draft'}
@@ -226,49 +314,23 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
     {
       title: 'Status',
       key: 'status',
+      responsive: ['md'] as Array<'md'>,
       render: (_: unknown, product: Product) => (
         <Tag color={product.active === false ? 'default' : 'green'}>
           {product.active === false ? 'Archived' : 'Active'}
         </Tag>
       ),
     },
-    {
-      title: '',
-      key: 'edit',
-      render: (_: unknown, product: Product) =>
-        role !== 'cashier' && (
-          <Space>
-            <Button icon={<InboxOutlined />} onClick={() => setPackagingProduct(product)}>
-              Packs
-            </Button>
-            <Button icon={<EditOutlined />} onClick={() => openEditor(product)}>
-              Edit
-            </Button>
-            <Button
-              icon={product.active === false ? <UndoOutlined /> : <StopOutlined />}
-              loading={lifecycleProductId === product.id}
-              onClick={() => void runLifecycle(product, product.active === false ? 'restore' : 'archive')}
-            >
-              {product.active === false ? 'Restore' : 'Archive'}
-            </Button>
-            {role === 'admin' && (
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                loading={lifecycleProductId === product.id}
-                onClick={() => {
-                  const confirmed = window.confirm(
-                    `Permanently delete ${product.name}? This only works when it has no sales or inventory history.`,
-                  )
-                  if (confirmed) void runLifecycle(product, 'delete')
-                }}
-              >
-                Delete
-              </Button>
-            )}
-          </Space>
-        ),
-    },
+    ...(role !== 'cashier'
+      ? [
+          {
+            title: 'Actions',
+            key: 'actions',
+            responsive: ['sm'] as Array<'sm'>,
+            render: (_: unknown, product: Product) => desktopActions(product),
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -282,7 +344,13 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
           className="mb-4 max-w-md"
           allowClear
         />
-        <Table columns={columns} dataSource={rows} rowKey="id" pagination={{ pageSize: 12 }} />
+        <Table
+          columns={columns}
+          dataSource={rows}
+          rowKey="id"
+          pagination={{ pageSize: 12 }}
+          scroll={{ x: 760 }}
+        />
       </Card>
       <Modal
         title="Edit product"
@@ -404,13 +472,27 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
               <CurrencyInput min={0} precision={2} size="large" className="w-full" />
             </Form.Item>
           </div>
-          <Form.Item
-            name="minimumSellingPrice"
-            label="Cashier price floor (₦)"
-            extra="Optional. When set, cashiers can agree a lower price down to this amount. Managers/admins can go below it with a reason."
-          >
-            <CurrencyInput min={0} precision={2} size="large" className="w-full" />
-          </Form.Item>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Form.Item
+              name="minimumSellingPrice"
+              label="Cashier price floor (₦)"
+              extra="Optional. When set, cashiers can agree a lower price down to this amount. Managers/admins can go below it with a reason."
+            >
+              <CurrencyInput min={0} precision={2} size="large" className="w-full" />
+            </Form.Item>
+            <Form.Item
+              name="lowStockThreshold"
+              label="Low-stock alert at"
+              extra={
+                <span className="text-[11px] text-red-500">
+                  Flag this product when stock reaches this quantity.
+                </span>
+              }
+              rules={[{ required: true, message: 'Enter a stock alert quantity.' }]}
+            >
+              <InputNumber min={0} precision={0} size="large" className="w-full" />
+            </Form.Item>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Form.Item name="onlinePublished" label="Online storefront">
               <Radio.Group

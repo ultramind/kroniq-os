@@ -22,6 +22,7 @@ export function ProductsPage({
       price: number
       costPrice: number
       minimumSellingPrice?: number
+      lowStockThreshold: number
       active: boolean
       description?: string
       imageUrl?: string

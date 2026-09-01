@@ -341,25 +341,38 @@ export function ProjectDetailsDrawer({
       title={project?.title ?? 'Contract details'}
       open={open}
       onClose={onClose}
-      width={980}
+      width="min(980px, 100vw)"
       loading={loading}
+      className="service-contract-drawer"
       extra={
-        <Space>
-          <Button icon={<PrinterOutlined />} onClick={printInvoice}>
-            Print invoice
+        <Space size="small" className="service-contract-actions">
+          <Button
+            icon={<PrinterOutlined />}
+            onClick={printInvoice}
+            aria-label="Print invoice"
+            title="Print invoice"
+          >
+            <span className="hidden sm:inline">Print invoice</span>
           </Button>
-          <Button icon={<ShareAltOutlined />} onClick={() => void shareInvoice()}>
-            Share invoice
+          <Button
+            icon={<ShareAltOutlined />}
+            onClick={() => void shareInvoice()}
+            aria-label="Share invoice"
+            title="Share invoice"
+          >
+            <span className="hidden sm:inline">Share invoice</span>
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
+            aria-label="Record payment"
+            title="Record payment"
             onClick={() => {
               paymentForm.setFieldsValue({ method: 'cash', receivedAt: dayjs() })
               setPaymentOpen(true)
             }}
           >
-            Record payment
+            <span className="hidden sm:inline">Record payment</span>
           </Button>
         </Space>
       }
@@ -427,11 +440,11 @@ export function ProjectDetailsDrawer({
                       ]}
                     />
                     <div>
-                      <div className="mb-3 flex items-center justify-between">
+                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h3 className="m-0 text-base">Assigned staff</h3>
                         <Select
                           mode="multiple"
-                          className="min-w-72"
+                          className="w-full sm:w-auto sm:min-w-72"
                           value={assigned}
                           onChange={(ids) => void saveAssignments(ids)}
                           options={staff.map((person) => ({
@@ -516,7 +529,7 @@ export function ProjectDetailsDrawer({
                 label: `Expenses (${expenses.length})`,
                 children: (
                   <>
-                    <div className="mb-4 flex items-center justify-between">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <Statistic
                         title="Total contract expenses"
                         value={totalExpense / 100}
@@ -597,7 +610,7 @@ export function ProjectDetailsDrawer({
               <Form.Item name="amount" label="Amount received (₦)" rules={[{ required: true }]}>
                 <InputNumber min={1} className="w-full" autoFocus />
               </Form.Item>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Form.Item name="receivedAt" label="Payment date" rules={[{ required: true }]}>
                   <DatePicker className="w-full" />
                 </Form.Item>
@@ -625,7 +638,7 @@ export function ProjectDetailsDrawer({
               <Form.Item name="description" label="Expense description" rules={[{ required: true }]}>
                 <Input autoFocus />
               </Form.Item>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Form.Item name="amount" label="Amount (₦)" rules={[{ required: true }]}>
                   <InputNumber min={1} className="w-full" />
                 </Form.Item>

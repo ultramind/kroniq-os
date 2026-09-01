@@ -230,7 +230,7 @@ export function CheckoutPage({
   return (
     <>
       <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_410px]">
-        <div className="fixed right-0 top-16 z-30 lg:hidden">
+        <div className="mobile-cart-trigger fixed z-40 lg:hidden">
           <Badge
             count={cartItemCount}
             size="small"
@@ -239,7 +239,7 @@ export function CheckoutPage({
             <Button
               type="primary"
               aria-label="Open current sale"
-              className="!h-[46px] !w-[46px] !rounded-l !rounded-r-none !p-0"
+              className="!h-[52px] !w-[52px] !rounded-full !p-0"
               icon={<ShoppingCartOutlined />}
               onClick={() => setCartDrawerOpen(true)}
             />
