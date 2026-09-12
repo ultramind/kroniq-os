@@ -11,7 +11,7 @@ type Props = {
   open: boolean
   saving?: boolean
   onClose: () => void
-  onSubmit: (sale: Sale, selected: Array<{ item: SaleItem; quantity: number }>) => void
+  onSubmit: (sale: Sale, selected: Array<{ item: SaleItem; quantity: number }>) => Promise<boolean> | boolean
 }
 
 export function PartialReturnModal({ sale, open, saving, onClose, onSubmit }: Props) {
@@ -44,7 +44,9 @@ export function PartialReturnModal({ sale, open, saving, onClose, onSubmit }: Pr
       okButtonProps={{ danger: true, disabled: !selected.length }}
       confirmLoading={saving}
       onCancel={onClose}
-      onOk={() => sale && onSubmit(sale, selected)}
+      onOk={() => {
+        if (sale) void onSubmit(sale, selected)
+      }}
       width={720}
       className="wide-modal"
     >

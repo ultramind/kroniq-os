@@ -39,7 +39,7 @@ export function Login({
   }
 
   return (
-    <main className="min-h-screen bg-white p-4 sm:p-6 lg:p-8">
+    <main className="auth-page min-h-screen bg-white p-4 sm:p-6 lg:p-8">
       {contextHolder}
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-6xl overflow-hidden border border-zinc-200 bg-white shadow-[0_24px_80px_rgb(11_17_33_/_9%)] lg:grid-cols-[1.05fr_.95fr]">
         <section

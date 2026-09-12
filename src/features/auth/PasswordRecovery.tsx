@@ -217,7 +217,7 @@ function AuthFrame({
   footer: ReactNode
 }) {
   return (
-    <main className="grid min-h-dvh place-items-center bg-[#f7f8fa] p-4 sm:p-6">
+    <main className="auth-page grid min-h-dvh place-items-center bg-[#f7f8fa] p-4 sm:p-6">
       <section className="w-full max-w-md border border-zinc-200 bg-white p-6 shadow-[0_24px_80px_rgb(11_17_33_/_9%)] sm:p-8">
         <Text className="!block text-xs font-bold uppercase tracking-[.18em] !text-zinc-500">{eyebrow}</Text>
         <Title level={2} className="!mb-2 !mt-3 !text-3xl !tracking-tight">

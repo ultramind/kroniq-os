@@ -11,7 +11,7 @@ import type { Product, ReceiptItem, Role, Sale, SaleItem, StockMovementReason } 
 import { AddProductModal, type ProductFormValues } from '../features/inventory/AddProductModal'
 import { StockAdjustmentModal } from '../features/inventory/StockAdjustmentModal'
 import { StockCountModal } from '../features/inventory/StockCountModal'
-import { recordStockAdjustment, recordStockDelivery } from '../features/inventory/inventory.service'
+import { recordStockAdjustment, recordStockDeliveryBatch } from '../features/inventory/inventory.service'
 import { DeliveryModal } from '../features/inventory/DeliveryModal'
 import { manageProductLifecycle, updateProductDetails } from '../features/inventory/product.service'
 import { saveOfflineSale, type CreditDetails } from '../features/pos/checkout.service'
@@ -47,6 +47,11 @@ const ProductsPage = lazy(() =>
 )
 const DeliveriesPage = lazy(() =>
   import('../pages/DeliveriesPage').then(({ DeliveriesPage }) => ({ default: DeliveriesPage })),
+)
+const SupplierPayablesPage = lazy(() =>
+  import('../pages/SupplierPayablesPage').then(({ SupplierPayablesPage }) => ({
+    default: SupplierPayablesPage,
+  })),
 )
 const ExpensesPage = lazy(() =>
   import('../pages/ExpensesPage').then(({ ExpensesPage }) => ({ default: ExpensesPage })),
@@ -103,6 +108,7 @@ export function App({
   const [savingCount, setSavingCount] = useState(false)
   const [savingHistoricalSale, setSavingHistoricalSale] = useState(false)
   const [savingCheckout, setSavingCheckout] = useState(false)
+  const [savingReturn, setSavingReturn] = useState(false)
   const [syncError, setSyncError] = useState<string>()
   const [flexiblePricingEnabled, setFlexiblePricingEnabled] = useState(
     () => getStoreSettings().flexiblePricingEnabled,
@@ -420,12 +426,17 @@ export function App({
     })
   }
   async function processReturn(sale: Sale, selected: Array<{ item: SaleItem; quantity: number }>) {
+    setSavingReturn(true)
     try {
       await returnSaleItems(sale, selected, enforcedStaffName)
       await Promise.all([pullProducts(), pullSales()])
       api.success(`Selected items from ${sale.receiptNo} were returned and stock was restored online.`)
+      return true
     } catch (error) {
       api.error(error instanceof Error ? error.message : 'Could not return sale.')
+      return false
+    } finally {
+      setSavingReturn(false)
     }
   }
   async function saveProduct(values: ProductFormValues) {
@@ -495,40 +506,32 @@ export function App({
     }
   }
   async function saveDelivery(values: {
-    productId: string
     supplierId?: string
     supplierName: string
     supplierPhone?: string
-    quantity: number
-    unitCost: number
-    sellingPrice?: number
+    lines: { productId: string; quantity: number; unitCost: number; sellingPrice?: number }[]
     receivedAt: string
     locationId: string
+    amountPaid: number
+    dueDate?: string
+    referenceNo?: string
+    notes?: string
   }) {
-    const product = products.find((item) => item.id === values.productId)
-    if (!product) return
     setSavingDelivery(true)
     try {
-      await recordStockDelivery(
-        product,
-        values.quantity,
-        values.unitCost,
-        values.supplierName,
-        values.receivedAt,
-        values.locationId,
-        values.sellingPrice,
-        values.supplierId,
-        values.supplierPhone,
-      )
+      await recordStockDeliveryBatch(products, values)
       await Promise.all([pullProducts(), pullDeliveries()])
       setDeliveryOpen(false)
-      api.success(
-        values.sellingPrice === undefined
-          ? 'Supplier delivery saved to Supabase.'
-          : 'Supplier delivery and selling price saved to Supabase.',
-      )
+      api.success('Supplier delivery batch saved to Supabase.')
     } catch (error) {
-      api.error(error instanceof Error ? error.message : 'Could not record delivery.')
+      api.error(
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error && 'message' in error && typeof error.message === 'string'
+            ? error.message
+            : 'Could not record delivery.',
+      )
+      throw error
     } finally {
       setSavingDelivery(false)
     }
@@ -687,7 +690,8 @@ export function App({
                   returnActivities={returnActivities}
                   role={state.role}
                   onViewReceipt={(sale) => void viewReceipt(sale)}
-                  onReturnSale={(sale, selected) => void processReturn(sale, selected)}
+                  onReturnSale={processReturn}
+                  returnSaving={savingReturn}
                   onRetryStockConflict={retryStockConflict}
                 />
               }
@@ -733,6 +737,7 @@ export function App({
                 />
               }
             />
+            <Route path="/supplier-debts" element={<SupplierPayablesPage />} />
             <Route path="/warehouses" element={<WarehousesPage products={products} />} />
             <Route
               path="/inventory"

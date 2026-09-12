@@ -388,6 +388,79 @@ html:has([data-theme='dark']),
 [data-theme='dark'] .border-slate-200 {
   border-color: var(--border) !important;
 }
+
+/* Public marketing pages use a few brand-color utility classes that need the
+   same contrast treatment as the signed-in product in dark mode. */
+[data-theme='dark'] .marketing-site {
+  background: var(--app-bg) !important;
+  color: var(--text) !important;
+}
+[data-theme='dark'] .marketing-site .text-\[\#0B1121\],
+[data-theme='dark'] .marketing-site .hover\:text-\[\#0B1121\]:hover {
+  color: var(--text) !important;
+}
+[data-theme='dark'] .marketing-site .bg-\[\#0B1121\] {
+  background-color: var(--surface-raised) !important;
+}
+[data-theme='dark'] .marketing-site .border-\[\#0B1121\] {
+  border-color: var(--border) !important;
+}
+[data-theme='dark'] .marketing-site .bg-white,
+[data-theme='dark'] .marketing-site .bg-white\/90,
+[data-theme='dark'] .marketing-site .bg-white\/95 {
+  background-color: var(--surface) !important;
+}
+[data-theme='dark'] .marketing-site .bg-slate-50,
+[data-theme='dark'] .marketing-site .bg-slate-100 {
+  background-color: var(--surface-raised) !important;
+}
+[data-theme='dark'] .marketing-site .text-slate-300,
+[data-theme='dark'] .marketing-site .text-slate-200,
+[data-theme='dark'] .marketing-site .text-slate-100 {
+  color: #e4e4e7 !important;
+}
+
+/* Authentication should feel like part of the product in dark mode. The
+   screens use Zinc utilities, so scope their contrast tokens here instead of
+   applying global overrides that could affect status colours elsewhere. */
+[data-theme='dark'] .auth-page {
+  background: var(--app-bg) !important;
+  color: var(--text);
+}
+[data-theme='dark'] .auth-page .bg-white {
+  background-color: var(--surface) !important;
+}
+[data-theme='dark'] .auth-page .bg-\[\#f7f8fa\] {
+  background-color: var(--surface-raised) !important;
+}
+[data-theme='dark'] .auth-page .text-\[\#0B1121\] {
+  color: var(--text) !important;
+}
+[data-theme='dark'] .auth-page .text-zinc-700,
+[data-theme='dark'] .auth-page .text-zinc-600 {
+  color: #d4d4d8 !important;
+}
+[data-theme='dark'] .auth-page .text-zinc-500 {
+  color: var(--muted) !important;
+}
+[data-theme='dark'] .auth-page .border-zinc-200 {
+  border-color: var(--border) !important;
+}
+[data-theme='dark'] .auth-page .ant-typography,
+[data-theme='dark'] .auth-page .ant-typography h1,
+[data-theme='dark'] .auth-page .ant-typography h2,
+[data-theme='dark'] .auth-page .ant-typography h3,
+[data-theme='dark'] .auth-page .ant-typography.ant-typography-secondary {
+  color: var(--text) !important;
+}
+[data-theme='dark'] .auth-page .ant-input,
+[data-theme='dark'] .auth-page .ant-input-affix-wrapper {
+  background: var(--surface-raised) !important;
+  color: var(--text) !important;
+}
+[data-theme='dark'] .auth-page .ant-input::placeholder {
+  color: var(--muted) !important;
+}
 .touch-target {
   min-height: 52px;
   transition:

@@ -41,7 +41,7 @@ export function CompanyRegistration({ onBack, onSignedIn }: { onBack: () => void
     onSignedIn()
   }
   return (
-    <main className="min-h-screen bg-white p-4 sm:p-6 lg:p-8">
+    <main className="auth-page min-h-screen bg-white p-4 sm:p-6 lg:p-8">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-6xl overflow-hidden border border-zinc-200 bg-white shadow-[0_24px_80px_rgb(11_17_33_/_9%)] lg:grid-cols-[.9fr_1.1fr]">
         <section
           className="relative flex min-h-[300px] flex-col justify-between overflow-hidden bg-[#f7f8fa] p-7 sm:p-10 lg:p-14"

@@ -1,5 +1,6 @@
 import { Button, Card, Table, Tag } from 'antd'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Link } from 'react-router-dom'
 import { db } from '../../db'
 import { formatNaira } from '../../lib/currency'
 import type { Role, Sale } from '../../types'
@@ -53,25 +54,39 @@ export function RecentSales({ sales, role, onViewReceipt, onReturnSale }: Props)
           <Button type="link" size="small" onClick={() => onViewReceipt(sale)}>
             Receipt
           </Button>
+          {sale.paymentMethod === 'order' && (
+            <Link to="/orders" className="ant-btn ant-btn-link ant-btn-sm">
+              View order
+            </Link>
+          )}
           {role !== 'cashier' && sale.syncStatus === 'stock_conflict' && (
             <Tag color="warning">Restock, then retry in Sales</Tag>
           )}
-          {role !== 'cashier' && sale.synced && !sale.historical && sale.status !== 'returned' && (
-            <Button type="link" danger size="small" onClick={() => onReturnSale(sale)}>
-              Return items
-            </Button>
-          )}
+          {role !== 'cashier' &&
+            sale.paymentMethod !== 'order' &&
+            sale.synced &&
+            !sale.historical &&
+            sale.status !== 'returned' && (
+              <Button type="link" danger size="small" onClick={() => onReturnSale(sale)}>
+                Return items
+              </Button>
+            )}
         </div>
       ),
     },
   ]
   return (
-    <Card title="Recent local sales" className="shadow-sm">
+    <Card title="Sales records" className="shadow-sm">
       <Table
         columns={columns}
         dataSource={sales}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          pageSize: 20,
+          showSizeChanger: true,
+          pageSizeOptions: [20, 50, 100],
+          showTotal: (total) => `${total} sale${total === 1 ? '' : 's'}`,
+        }}
         locale={{ emptyText: 'No sales recorded yet.' }}
         size="small"
       />

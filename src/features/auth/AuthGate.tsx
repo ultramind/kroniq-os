@@ -107,6 +107,7 @@ export function AuthGate() {
     workspaceError?: string
   }>({ loading: true })
   const wasUnauthenticated = useRef(false)
+  const workspaceReady = useRef(false)
   const navigateRef = useRef(navigate)
   const stopCheckoutDraftPersistence = useRef<(() => void) | undefined>(undefined)
   const checkoutDraftWorkspace = useRef<{ userId: string; organizationId: string } | undefined>(undefined)
@@ -202,6 +203,7 @@ export function AuthGate() {
           data: { session },
         } = await within(client.auth.getSession(), 'Session check')
         if (!session) {
+          workspaceReady.current = false
           wasUnauthenticated.current = true
           resetTenantUiState()
           // Keep the cache owner marker until the next successful sign-in. It
@@ -227,6 +229,7 @@ export function AuthGate() {
             client.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle(),
             'Platform access check',
           )
+          workspaceReady.current = true
           setState({ loading: false, platformAdmin: Boolean(membership), platformDenied: !membership })
           return
         }
@@ -243,6 +246,7 @@ export function AuthGate() {
               tenantName: cachedWorkspace.tenantName,
               tenantLogoUrl: cachedWorkspace.tenantLogoUrl,
             })
+            workspaceReady.current = true
             return
           }
           setState({
@@ -371,6 +375,7 @@ export function AuthGate() {
           'Subscription check',
         )) as { data: { organization_status?: string } | null }
         if (billing?.organization_status === 'suspended') {
+          workspaceReady.current = true
           setState({
             loading: false,
             billingBlocked: true,
@@ -388,11 +393,13 @@ export function AuthGate() {
         if (data.role === 'cashier' && navigator.onLine) void pullProducts()
         const shouldRedirectToWorkspace =
           redirectToDefault || pathname === '/login' || pathname === '/register'
+        workspaceReady.current = true
         setState({ loading: false, role: data.role, staffName: data.full_name, tenantName, tenantLogoUrl })
         if (shouldRedirectToWorkspace) {
-          const restoringExistingSession = redirectToDefault && !wasUnauthenticated.current
+          const isFreshSignIn = redirectToDefault && wasUnauthenticated.current
+          const restoringExistingSession = redirectToDefault && !isFreshSignIn
           wasUnauthenticated.current = false
-          message.success('Logged in successfully.')
+          if (isFreshSignIn) message.success('Logged in successfully.')
           const lastRoute = sessionStorage.getItem(
             lastTenantRouteKey(session.user.id, activeWorkspace.organizationId),
           )
@@ -411,6 +418,7 @@ export function AuthGate() {
         } = await client.auth.getSession()
         const cachedWorkspace = session ? getOfflineWorkspace(session.user.id) : undefined
         if (!platformRoute && cachedWorkspace) {
+          workspaceReady.current = true
           setState({
             loading: false,
             role: cachedWorkspace.role,
@@ -442,6 +450,7 @@ export function AuthGate() {
       // entire workspace behind the startup loader.
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return
       if (event === 'SIGNED_OUT') {
+        workspaceReady.current = false
         // A new sign-in with the same email must be able to choose another
         // active company. Preserve each scoped offline database, but discard
         // the browser-session preference for the previously opened company.
@@ -451,6 +460,10 @@ export function AuthGate() {
         if (workspace?.userId && workspace.organizationId)
           sessionStorage.removeItem(lastTenantRouteKey(workspace.userId, workspace.organizationId))
       }
+      // Some browsers emit SIGNED_IN again after a tab returns to the
+      // foreground. The existing session is already usable, so never cover
+      // the active app with the startup loader or repeat the login toast.
+      if (event === 'SIGNED_IN' && workspaceReady.current) return
       void load(event === 'SIGNED_IN')
     })
     return () => listener.subscription.unsubscribe()
@@ -494,14 +507,14 @@ export function AuthGate() {
             {state.tenantName ?? 'Kroniqos'}
           </Typography.Title>
           <Typography.Text className="kroniq-loader-subtitle relative">
-            Loading workspace securely
+            Loading your business securely
           </Typography.Text>
           <div className="kroniq-loader-track relative mx-auto mt-4 h-px w-44 overflow-hidden">
             <span className="kroniq-loader-line block h-full w-1/2" />
           </div>
           <div className="kroniq-loader-status relative mt-2 flex items-center justify-center gap-2 text-[11px]">
             <CloudSyncOutlined className="kroniq-loader-spin" />
-            Powered by Kroniqos
+            Powered by AMT
           </div>
         </div>
       </main>

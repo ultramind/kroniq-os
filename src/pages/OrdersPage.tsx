@@ -41,6 +41,7 @@ type OrderStockItem = {
   quantity: number
   unitsPerPackage: number
   availableStock: number
+  defaultCost: number
 }
 type OrderRefund = { id: string; saleId: string; amount: number; refundedAt: string; staffName?: string }
 export function OrdersPage({
@@ -116,7 +117,7 @@ export function OrdersPage({
     void load()
   }, [])
   useEffect(() => {
-    if (!editing || status !== 'fulfilled' || !supabase) {
+    if (!editing || !supabase) {
       setOrderStockItems([])
       setLoadingOrderStock(false)
       return
@@ -127,7 +128,9 @@ export function OrdersPage({
       setLoadingOrderStock(true)
       const { data, error } = await client
         .from('sale_items')
-        .select('id,product_id,quantity,units_per_package,package_name,products(name,stock_quantity)')
+        .select(
+          'id,product_id,quantity,units_per_package,package_name,cost_price_kobo,products(name,stock_quantity)',
+        )
         .eq('sale_id', editing.id)
       if (cancelled) return
       setLoadingOrderStock(false)
@@ -135,28 +138,35 @@ export function OrdersPage({
         api.error(`Could not load current stock: ${error.message}`)
         return
       }
-      setOrderStockItems(
-        (data ?? []).map((item) => {
-          const product = (Array.isArray(item.products) ? item.products[0] : item.products) as {
-            name?: string
-            stock_quantity?: number
-          } | null
-          return {
-            id: item.id,
-            productId: item.product_id,
-            productName: product?.name ?? item.package_name ?? 'Product',
-            quantity: item.quantity,
-            unitsPerPackage: item.units_per_package ?? 1,
-            availableStock: product?.stock_quantity ?? 0,
-          }
-        }),
+      const items = (data ?? []).map((item) => {
+        const product = (Array.isArray(item.products) ? item.products[0] : item.products) as {
+          name?: string
+          stock_quantity?: number
+        } | null
+        return {
+          id: item.id,
+          productId: item.product_id,
+          productName: product?.name ?? item.package_name ?? 'Product',
+          quantity: item.quantity,
+          unitsPerPackage: item.units_per_package ?? 1,
+          availableStock: product?.stock_quantity ?? 0,
+          defaultCost: (item.cost_price_kobo ?? 0) / 100,
+        }
+      })
+      setOrderStockItems(items)
+      // Start with the saved catalogue cost, or reconstruct it for a legacy
+      // order. Managers can still replace this with the true sourcing cost.
+      setFulfilmentCost(
+        (current) =>
+          current ??
+          items.reduce((sum, item) => sum + item.defaultCost * item.quantity * item.unitsPerPackage, 0),
       )
     }
     void loadOrderStock()
     return () => {
       cancelled = true
     }
-  }, [api, editing, status])
+  }, [api, editing])
   const orders = sales
     .filter((sale) => sale.paymentMethod === 'order' && sale.status !== 'returned')
     .sort((first, second) => dayjs(second.createdAt).valueOf() - dayjs(first.createdAt).valueOf())
@@ -261,11 +271,15 @@ export function OrdersPage({
     setSavingOrder(true)
     try {
       if (!(await ensureOrderSynced(editing))) return
+      const derivedCatalogueCost = orderStockItems.reduce(
+        (sum, item) => sum + item.defaultCost * item.quantity * item.unitsPerPackage,
+        0,
+      )
       const { error } = await supabase.rpc('update_order_management', {
         p_sale_id: editing.id,
         p_status: status,
         p_notes: notes,
-        p_order_cost_kobo: fulfilmentCost == null ? null : Math.round(fulfilmentCost * 100),
+        p_order_cost_kobo: Math.round((fulfilmentCost ?? derivedCatalogueCost) * 100),
         p_deduct_stock: status === 'fulfilled' && deductFromStock,
       })
       if (error) return api.error(error.message)

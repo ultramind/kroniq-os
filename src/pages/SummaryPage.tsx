@@ -189,18 +189,19 @@ export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: R
   )
   const fulfilledOrders = orders.filter((sale) => sale.orderStatus === 'fulfilled')
   const fulfilledOrderRevenue = fulfilledOrders.reduce((sum, sale) => sum + sale.total, 0)
-  const expectedOrderProfit = fulfilledOrders.reduce(
-    (sum, sale) =>
-      sum +
-      sale.total -
-      saleItems
-        .filter((item) => item.saleId === sale.id)
-        .reduce((cost, item) => cost + (item.costPrice ?? 0) * item.quantity, 0),
-    0,
-  )
-  const orderProfit = fulfilledOrders
-    .filter((sale) => sale.orderCost != null)
-    .reduce((sum, sale) => sum + sale.total - (sale.orderCost ?? 0), 0)
+  const catalogueOrderCost = (sale: Sale) =>
+    saleItems
+      .filter((item) => item.saleId === sale.id)
+      .reduce((cost, item) => cost + (item.costPrice ?? 0) * item.quantity * (item.unitsPerPackage ?? 1), 0)
+  // Expected profit is always based on the immutable line-cost snapshot.
+  // Actual fulfilment cost can later replace orderCost, so it must not alter
+  // this benchmark. orderCost remains a fallback for legacy orders.
+  const expectedCost = (sale: Sale) => catalogueOrderCost(sale) || sale.orderCost || 0
+  const actualCost = (sale: Sale) => sale.orderCost ?? expectedCost(sale)
+  const expectedOrderProfit = orders
+    .filter((sale) => sale.orderStatus !== 'cancelled')
+    .reduce((sum, sale) => sum + sale.total - expectedCost(sale), 0)
+  const orderProfit = fulfilledOrders.reduce((sum, sale) => sum + sale.total - actualCost(sale), 0)
   const dueOrders = activeOrders.filter(
     (sale) => sale.creditDueDate && sale.creditDueDate <= dayjs().format('YYYY-MM-DD'),
   )

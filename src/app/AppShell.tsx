@@ -155,17 +155,19 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
                       ? 'products'
                       : pathname.startsWith('/deliveries')
                         ? 'deliveries'
-                        : pathname.startsWith('/warehouses')
-                          ? 'warehouses'
-                          : pathname.startsWith('/sales')
-                            ? 'sales'
-                            : pathname.startsWith('/inventory')
-                              ? 'inventory'
-                              : pathname.startsWith('/services')
-                                ? 'services'
-                                : pathname.startsWith('/settings')
-                                  ? 'settings'
-                                  : 'checkout'
+                        : pathname.startsWith('/supplier-debts')
+                          ? 'supplier-debts'
+                          : pathname.startsWith('/warehouses')
+                            ? 'warehouses'
+                            : pathname.startsWith('/sales')
+                              ? 'sales'
+                              : pathname.startsWith('/inventory')
+                                ? 'inventory'
+                                : pathname.startsWith('/services')
+                                  ? 'services'
+                                  : pathname.startsWith('/settings')
+                                    ? 'settings'
+                                    : 'checkout'
   const title =
     activeKey === 'dashboard'
       ? 'Dashboard'
@@ -187,17 +189,19 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
                       ? 'Products'
                       : activeKey === 'deliveries'
                         ? 'Supplier deliveries'
-                        : activeKey === 'warehouses'
-                          ? 'Warehouses'
-                          : activeKey === 'sales'
-                            ? 'Sales'
-                            : activeKey === 'inventory'
-                              ? 'Inventory'
-                              : activeKey === 'services'
-                                ? 'Service jobs'
-                                : activeKey === 'settings'
-                                  ? 'Settings'
-                                  : 'Checkout'
+                        : activeKey === 'supplier-debts'
+                          ? 'Supplier debts'
+                          : activeKey === 'warehouses'
+                            ? 'Warehouses'
+                            : activeKey === 'sales'
+                              ? 'Sales'
+                              : activeKey === 'inventory'
+                                ? 'Inventory'
+                                : activeKey === 'services'
+                                  ? 'Service jobs'
+                                  : activeKey === 'settings'
+                                    ? 'Settings'
+                                    : 'Checkout'
   const menuItems = [
     { key: 'dashboard', icon: <PieChartOutlined />, label: 'Dashboard' },
     ...(retailEnabled
@@ -246,6 +250,7 @@ export function AppShell({ role, pendingSync, syncError, onRetrySync, onReloadCa
               { key: 'products', icon: <AppstoreOutlined />, label: 'Products' },
               { key: 'inventory', icon: <InboxOutlined />, label: 'Inventory' },
               { key: 'deliveries', icon: <TruckOutlined />, label: 'Deliveries' },
+              { key: 'supplier-debts', icon: <MoneyCollectOutlined />, label: 'Supplier debts' },
               { key: 'warehouses', icon: <DatabaseOutlined />, label: 'Warehouses' },
             ],
           },

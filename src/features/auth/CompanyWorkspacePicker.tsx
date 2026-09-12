@@ -20,7 +20,7 @@ export function CompanyWorkspacePicker({
   onSignOut: () => void
 }) {
   return (
-    <main className="min-h-dvh overflow-y-auto bg-[#f7f8fa] px-3 py-5 sm:grid sm:place-items-center sm:p-6">
+    <main className="auth-page min-h-dvh overflow-y-auto bg-[#f7f8fa] px-3 py-5 sm:grid sm:place-items-center sm:p-6">
       <section className="mx-auto w-full max-w-2xl border border-zinc-200 bg-white p-4 shadow-[0_24px_80px_rgb(11_17_33_/_9%)] sm:p-9">
         <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
           <div>

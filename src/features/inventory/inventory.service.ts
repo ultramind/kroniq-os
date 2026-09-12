@@ -91,3 +91,77 @@ export async function recordStockDelivery(
     await db.stockMovements.add(movement)
   })
 }
+
+export async function recordStockDeliveryBatch(
+  products: Product[],
+  delivery: {
+    supplierId?: string
+    supplierName: string
+    supplierPhone?: string
+    lines: { productId: string; quantity: number; unitCost: number; sellingPrice?: number }[]
+    receivedAt: string
+    locationId: string
+    amountPaid: number
+    dueDate?: string
+    referenceNo?: string
+    notes?: string
+  },
+) {
+  if (!delivery.supplierName.trim() || !delivery.lines.length)
+    throw new Error('Add a supplier and at least one product.')
+  const client = requireOnlineInventory()
+  const batchId = crypto.randomUUID()
+  const createdAt = new Date().toISOString()
+  const lines = delivery.lines.map((line) => ({
+    id: crypto.randomUUID(),
+    product_id: line.productId,
+    quantity: line.quantity,
+    unit_cost_kobo: Math.round(line.unitCost * 100),
+    selling_price_kobo: line.sellingPrice === undefined ? null : Math.round(line.sellingPrice * 100),
+  }))
+  const { error } = await client.rpc('record_stock_delivery_batch', {
+    p_batch: {
+      id: batchId,
+      supplier_id: delivery.supplierId ?? null,
+      supplier_name: delivery.supplierName.trim(),
+      supplier_phone: delivery.supplierPhone ?? null,
+      location_id: delivery.locationId,
+      received_at: delivery.receivedAt,
+      amount_paid_kobo: Math.round(delivery.amountPaid * 100),
+      due_date: delivery.dueDate ?? null,
+      reference_no: delivery.referenceNo ?? null,
+      notes: delivery.notes ?? null,
+      lines,
+    },
+  })
+  if (error) throw error
+  await db.transaction('rw', db.products, db.stockDeliveries, db.stockMovements, async () => {
+    for (const line of delivery.lines) {
+      const product = products.find((item) => item.id === line.productId)
+      if (!product) continue
+      await db.products.update(product.id, {
+        stock: product.stock + line.quantity,
+        costPrice: line.unitCost,
+        ...(line.sellingPrice === undefined ? {} : { price: line.sellingPrice }),
+      })
+      await db.stockDeliveries.add({
+        id: lines.find((item) => item.product_id === line.productId)?.id ?? crypto.randomUUID(),
+        productId: product.id,
+        supplierName: delivery.supplierName.trim(),
+        quantity: line.quantity,
+        unitCost: line.unitCost,
+        receivedAt: delivery.receivedAt,
+        createdAt,
+        synced: true,
+      })
+      await db.stockMovements.add({
+        id: crypto.randomUUID(),
+        productId: product.id,
+        quantityDelta: line.quantity,
+        reason: 'delivery',
+        createdAt,
+        synced: true,
+      })
+    }
+  })
+}

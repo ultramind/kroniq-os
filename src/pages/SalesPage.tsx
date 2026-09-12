@@ -19,7 +19,8 @@ type Props = {
   returnActivities: ReturnActivity[]
   role: Role
   onViewReceipt: (sale: Sale) => void
-  onReturnSale: (sale: Sale, selected: Array<{ item: SaleItem; quantity: number }>) => void
+  onReturnSale: (sale: Sale, selected: Array<{ item: SaleItem; quantity: number }>) => Promise<boolean>
+  returnSaving: boolean
   onRetryStockConflict: (saleId: string) => Promise<void>
 }
 
@@ -45,6 +46,7 @@ export function SalesPage({
   role,
   onViewReceipt,
   onReturnSale,
+  returnSaving,
   onRetryStockConflict,
 }: Props) {
   const [method, setMethod] = useState<string>('all')
@@ -69,7 +71,6 @@ export function SalesPage({
     .sort((a, b) =>
       sort === 'newest' ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt),
     )
-    .slice(0, 20)
   const reportSales = filtered.filter((sale) => sale.status !== 'returned')
   const stockConflicts = allSales.filter((sale) => sale.syncStatus === 'stock_conflict')
   const total = reportSales.reduce((sum, sale) => sum + sale.total, 0)
@@ -265,10 +266,12 @@ export function SalesPage({
       <PartialReturnModal
         sale={returningSale}
         open={Boolean(returningSale)}
+        saving={returnSaving}
         onClose={() => setReturningSale(undefined)}
-        onSubmit={(sale, selected) => {
-          onReturnSale(sale, selected)
-          setReturningSale(undefined)
+        onSubmit={async (sale, selected) => {
+          const succeeded = await onReturnSale(sale, selected)
+          if (succeeded) setReturningSale(undefined)
+          return succeeded
         }}
       />
       <BulkCsvImportModal

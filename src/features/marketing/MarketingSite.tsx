@@ -4,16 +4,19 @@ import {
   CheckOutlined,
   CloudSyncOutlined,
   MenuOutlined,
+  MoonOutlined,
   ProjectOutlined,
   SafetyCertificateOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
+  SunOutlined,
   WalletOutlined,
 } from '@ant-design/icons'
-import { Button, Collapse, Drawer, Input, message } from 'antd'
+import { Button, Collapse, Drawer, Input, Tooltip, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTheme } from '../../app/theme'
 
 const nav = [
   { label: 'Product', to: '/product' },
@@ -625,6 +628,7 @@ function SimplePage({ type }: { type: string }) {
 }
 
 export function MarketingSite() {
+  const { mode, toggleTheme } = useTheme()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -689,6 +693,15 @@ export function MarketingSite() {
             ))}
           </nav>
           <div className="hidden items-center gap-2 md:flex">
+            <Tooltip title={mode === 'dark' ? 'Use light theme' : 'Use dark theme'}>
+              <Button
+                type="text"
+                aria-label="Toggle colour theme"
+                className="theme-toggle !flex !h-9 !w-9 !items-center !justify-center"
+                icon={mode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+                onClick={toggleTheme}
+              />
+            </Tooltip>
             <Button type="text" onClick={() => navigate('/login')}>
               Sign in
             </Button>
@@ -696,18 +709,29 @@ export function MarketingSite() {
               Start free
             </Button>
           </div>
-          <Button
-            className="md:hidden"
-            aria-label="Open menu"
-            icon={<MenuOutlined />}
-            onClick={() => setOpen(true)}
-          />
+          <div className="flex items-center gap-1 md:hidden">
+            <Button
+              type="text"
+              aria-label="Toggle colour theme"
+              className="theme-toggle !flex !h-9 !w-9 !items-center !justify-center"
+              icon={mode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+              onClick={toggleTheme}
+            />
+            <Button aria-label="Open menu" icon={<MenuOutlined />} onClick={() => setOpen(true)} />
+          </div>
         </div>
       </header>
       {body}
       <Footer />
       <Drawer title="Kroniqos" placement="right" open={open} onClose={() => setOpen(false)}>
         <div className="flex flex-col gap-3">
+          <Button
+            className="justify-start"
+            icon={mode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+            onClick={toggleTheme}
+          >
+            Use {mode === 'dark' ? 'light' : 'dark'} theme
+          </Button>
           {nav.map((item) => (
             <Link
               key={item.to}

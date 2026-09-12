@@ -309,13 +309,14 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
 export async function pullSales(): Promise<{ loaded: number; error?: string }> {
   if (!supabase || !navigator.onLine) return { loaded: 0 }
   const pageSize = 500
-  const maximumCachedSales = 5000
   const data: any[] = []
-  for (let offset = 0; offset < maximumCachedSales; offset += pageSize) {
+  // Keep the local reporting cache complete. The Sales screen paginates the
+  // result, but yearly reports must not silently stop after an arbitrary cap.
+  for (let offset = 0; ; offset += pageSize) {
     const response = await supabase
       .from('sales')
       .select(
-        'id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, order_status, order_notes, order_cost_kobo, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, products(name))',
+        'id, receipt_no, total_kobo, payment_method, sold_at, cashier_id, returned_at, is_historical, order_status, order_notes, order_cost_kobo, credit_customer_name, credit_customer_phone, credit_due_date, credit_initial_payment_kobo, credit_settled_at, sale_items(id, product_id, quantity, unit_price_kobo, list_price_kobo, price_override_reason, cost_price_kobo, units_per_package, products(name))',
       )
       .order('sold_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
@@ -363,6 +364,7 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
               : item.list_price_kobo / 100,
           priceOverrideReason: item.price_override_reason ?? undefined,
           costPrice: (item.cost_price_kobo ?? 0) / 100,
+          unitsPerPackage: item.units_per_package ?? 1,
         }
       })
       if (items.length) {
@@ -377,13 +379,19 @@ export async function pullSales(): Promise<{ loaded: number; error?: string }> {
 /** Loads the supplier delivery register from Supabase for the inventory operations page. */
 export async function pullDeliveries(): Promise<{ loaded: number; error?: string }> {
   if (!supabase || !navigator.onLine) return { loaded: 0 }
-  const { data, error } = await supabase
-    .from('supplier_deliveries')
-    .select('id, product_id, quantity, unit_cost_kobo, received_at, created_at, suppliers(name)')
-    .order('received_at', { ascending: false })
-    .limit(500)
-  if (error) return { loaded: 0, error: error.message }
-  const deliveries: StockDelivery[] = (data ?? []).map((row) => {
+  const rows: any[] = []
+  const pageSize = 1000
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('supplier_deliveries')
+      .select('id, product_id, quantity, unit_cost_kobo, received_at, created_at, suppliers(name)')
+      .order('received_at', { ascending: false })
+      .range(from, from + pageSize - 1)
+    if (error) return { loaded: 0, error: error.message }
+    rows.push(...(data ?? []))
+    if (!data || data.length < pageSize) break
+  }
+  const deliveries: StockDelivery[] = rows.map((row) => {
     const supplier = Array.isArray(row.suppliers) ? row.suppliers[0] : row.suppliers
     return {
       id: row.id,
