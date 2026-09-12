@@ -6,6 +6,7 @@ export type CreditDetails = {
   customerPhone: string
   dueDate?: string
   initialPayment?: number
+  note?: string
 }
 export async function saveOfflineSale(
   cart: CartItem[],
@@ -31,6 +32,7 @@ export async function saveOfflineSale(
     creditCustomerPhone: credit?.customerPhone,
     creditDueDate: credit?.dueDate,
     creditInitialPayment: credit?.initialPayment ?? 0,
+    orderNotes: paymentMethod === 'order' ? credit?.note?.trim() || undefined : undefined,
   }
   await db.transaction('rw', db.sales, db.saleItems, db.products, db.stockMovements, db.outbox, async () => {
     await db.sales.add(sale)

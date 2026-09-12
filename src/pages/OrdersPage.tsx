@@ -1,5 +1,19 @@
 import { MoreOutlined } from '@ant-design/icons'
-import { Button, Card, Dropdown, Input, Modal, Select, Statistic, Table, Tag, message } from 'antd'
+import {
+  Alert,
+  Button,
+  Card,
+  DatePicker,
+  Dropdown,
+  Input,
+  Modal,
+  Select,
+  Statistic,
+  Switch,
+  Table,
+  Tag,
+  message,
+} from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { CreditPaymentModal } from '../features/sales/CreditPaymentModal'
@@ -19,6 +33,16 @@ const statusColors: Record<(typeof statuses)[number], string> = {
   fulfilled: 'success',
   cancelled: 'error',
 }
+
+type OrderStockItem = {
+  id: string
+  productId: string
+  productName: string
+  quantity: number
+  unitsPerPackage: number
+  availableStock: number
+}
+type OrderRefund = { id: string; saleId: string; amount: number; refundedAt: string; staffName?: string }
 export function OrdersPage({
   sales,
   onRefreshSales,
@@ -29,12 +53,18 @@ export function OrdersPage({
   onViewReceipt: (sale: Sale) => void
 }) {
   const [payments, setPayments] = useState<CreditPayment[]>([])
+  const [refunds, setRefunds] = useState<OrderRefund[]>([])
   const [selected, setSelected] = useState<Sale>()
   const [historyOrder, setHistoryOrder] = useState<Sale>()
   const [editing, setEditing] = useState<Sale>()
   const [notes, setNotes] = useState('')
   const [fulfilmentCost, setFulfilmentCost] = useState<number | null>(null)
   const [status, setStatus] = useState<string>('pending')
+  const [deductFromStock, setDeductFromStock] = useState(false)
+  const [orderStockItems, setOrderStockItems] = useState<OrderStockItem[]>([])
+  const [loadingOrderStock, setLoadingOrderStock] = useState(false)
+  const [refundAmount, setRefundAmount] = useState<number | null>(null)
+  const [refundDate, setRefundDate] = useState(dayjs().format('YYYY-MM-DD'))
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [dueFilter, setDueFilter] = useState<string>('all')
   const [savingPayment, setSavingPayment] = useState(false)
@@ -42,12 +72,36 @@ export function OrdersPage({
   const [api, holder] = message.useMessage()
   const load = async () => {
     if (!supabase) return
-    const { data } = await supabase
-      .from('order_payments')
-      .select('id,sale_id,amount_kobo,paid_at,created_at,profiles(full_name)')
-      .order('paid_at', { ascending: false })
+    const [{ data: paymentRows }, { data: refundRows, error: refundError }] = await Promise.all([
+      supabase
+        .from('order_payments')
+        .select('id,sale_id,amount_kobo,paid_at,created_at,profiles(full_name)')
+        .order('paid_at', { ascending: false }),
+      supabase
+        .from('order_refunds')
+        .select('id,sale_id,amount_kobo,refunded_at,profiles(full_name)')
+        .order('refunded_at', { ascending: false }),
+    ])
+    if (refundError) {
+      // The table is introduced by the order-cancellation migration.
+      setRefunds([])
+    } else {
+      setRefunds(
+        (refundRows ?? []).map((refund) => ({
+          id: refund.id,
+          saleId: refund.sale_id,
+          amount: refund.amount_kobo / 100,
+          refundedAt: refund.refunded_at,
+          staffName: (
+            (Array.isArray(refund.profiles) ? refund.profiles[0] : refund.profiles) as {
+              full_name?: string
+            } | null
+          )?.full_name,
+        })),
+      )
+    }
     setPayments(
-      (data ?? []).map((p) => ({
+      (paymentRows ?? []).map((p) => ({
         id: p.id,
         saleId: p.sale_id,
         amount: p.amount_kobo / 100,
@@ -61,7 +115,51 @@ export function OrdersPage({
   useEffect(() => {
     void load()
   }, [])
-  const orders = sales.filter((sale) => sale.paymentMethod === 'order' && sale.status !== 'returned')
+  useEffect(() => {
+    if (!editing || status !== 'fulfilled' || !supabase) {
+      setOrderStockItems([])
+      setLoadingOrderStock(false)
+      return
+    }
+    const client = supabase
+    let cancelled = false
+    const loadOrderStock = async () => {
+      setLoadingOrderStock(true)
+      const { data, error } = await client
+        .from('sale_items')
+        .select('id,product_id,quantity,units_per_package,package_name,products(name,stock_quantity)')
+        .eq('sale_id', editing.id)
+      if (cancelled) return
+      setLoadingOrderStock(false)
+      if (error) {
+        api.error(`Could not load current stock: ${error.message}`)
+        return
+      }
+      setOrderStockItems(
+        (data ?? []).map((item) => {
+          const product = (Array.isArray(item.products) ? item.products[0] : item.products) as {
+            name?: string
+            stock_quantity?: number
+          } | null
+          return {
+            id: item.id,
+            productId: item.product_id,
+            productName: product?.name ?? item.package_name ?? 'Product',
+            quantity: item.quantity,
+            unitsPerPackage: item.units_per_package ?? 1,
+            availableStock: product?.stock_quantity ?? 0,
+          }
+        }),
+      )
+    }
+    void loadOrderStock()
+    return () => {
+      cancelled = true
+    }
+  }, [api, editing, status])
+  const orders = sales
+    .filter((sale) => sale.paymentMethod === 'order' && sale.status !== 'returned')
+    .sort((first, second) => dayjs(second.createdAt).valueOf() - dayjs(first.createdAt).valueOf())
   const today = dayjs().format('YYYY-MM-DD')
   const filteredOrders = orders.filter((order) => {
     const due = order.creditDueDate
@@ -83,6 +181,10 @@ export function OrdersPage({
   )
   const balance = (sale: Sale) =>
     Math.max(0, sale.total - (sale.creditInitialPayment ?? 0) - (paid[sale.id] ?? 0))
+  const refundTotal = (sale: Sale) =>
+    refunds.filter((refund) => refund.saleId === sale.id).reduce((sum, refund) => sum + refund.amount, 0)
+  const paidTotal = (sale: Sale) => sale.total - balance(sale)
+  const refundableAmount = (sale: Sale) => Math.max(0, paidTotal(sale) - refundTotal(sale))
   const ensureOrderSynced = async (sale: Sale) => {
     if (!supabase) return false
     const { data, error } = await supabase.from('sales').select('id').eq('id', sale.id).maybeSingle()
@@ -164,11 +266,24 @@ export function OrdersPage({
         p_status: status,
         p_notes: notes,
         p_order_cost_kobo: fulfilmentCost == null ? null : Math.round(fulfilmentCost * 100),
+        p_deduct_stock: status === 'fulfilled' && deductFromStock,
       })
       if (error) return api.error(error.message)
+      if (status === 'cancelled' && refundAmount && refundAmount > 0) {
+        const { error: refundError } = await supabase.rpc('record_order_refund', {
+          p_sale_id: editing.id,
+          p_amount_kobo: Math.round(refundAmount * 100),
+          p_refunded_at: refundDate,
+        })
+        if (refundError) return api.error(refundError.message)
+      }
       setEditing(undefined)
+      setRefundAmount(null)
       await onRefreshSales()
-      api.success('Order updated.')
+      await load()
+      api.success(
+        status === 'cancelled' && refundAmount ? 'Order cancelled and refund recorded.' : 'Order updated.',
+      )
     } finally {
       setSavingOrder(false)
     }
@@ -235,6 +350,56 @@ export function OrdersPage({
           scroll={{ x: 1320 }}
           dataSource={filteredOrders}
           columns={[
+            {
+              title: 'Actions',
+              align: 'center',
+              width: 84,
+              fixed: 'left',
+              render: (_, o: Sale) => (
+                <Dropdown
+                  trigger={['click']}
+                  menu={{
+                    items: [
+                      {
+                        key: 'payment',
+                        label: 'Add payment',
+                        disabled:
+                          !balance(o) || ['fulfilled', 'cancelled'].includes(o.orderStatus ?? 'pending'),
+                      },
+                      { key: 'history', label: 'Payment history' },
+                      { key: 'print', label: 'Print receipt' },
+                      { type: 'divider' },
+                      {
+                        key: 'manage',
+                        label: 'Manage order',
+                        disabled: ['fulfilled', 'cancelled'].includes(o.orderStatus ?? 'pending'),
+                      },
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'payment') setSelected(o)
+                      if (key === 'history') setHistoryOrder(o)
+                      if (key === 'print') onViewReceipt(o)
+                      if (key === 'manage') {
+                        setEditing(o)
+                        setStatus(o.orderStatus ?? 'pending')
+                        setNotes(o.orderNotes ?? '')
+                        setFulfilmentCost(o.orderCost ?? null)
+                        setDeductFromStock(false)
+                        setRefundAmount(null)
+                        setRefundDate(dayjs().format('YYYY-MM-DD'))
+                      }
+                    },
+                  }}
+                >
+                  <Button
+                    type="text"
+                    shape="circle"
+                    aria-label={`Actions for order ${o.receiptNo}`}
+                    icon={<MoreOutlined />}
+                  />
+                </Dropdown>
+              ),
+            },
             { title: 'Client', dataIndex: 'creditCustomerName' },
             { title: 'Phone', dataIndex: 'creditCustomerPhone' },
             { title: 'Total', render: (_, o: Sale) => formatNaira(o.total) },
@@ -269,43 +434,6 @@ export function OrdersPage({
                 <Tag color={statusColors[o.orderStatus ?? 'pending']}>
                   {(o.orderStatus ?? 'pending').replace('_', ' ')}
                 </Tag>
-              ),
-            },
-            {
-              title: 'Actions',
-              align: 'center',
-              width: 84,
-              render: (_, o: Sale) => (
-                <Dropdown
-                  trigger={['click']}
-                  menu={{
-                    items: [
-                      { key: 'payment', label: 'Add payment', disabled: !balance(o) },
-                      { key: 'history', label: 'Payment history' },
-                      { key: 'print', label: 'Print receipt' },
-                      { type: 'divider' },
-                      { key: 'manage', label: 'Manage order' },
-                    ],
-                    onClick: ({ key }) => {
-                      if (key === 'payment') setSelected(o)
-                      if (key === 'history') setHistoryOrder(o)
-                      if (key === 'print') onViewReceipt(o)
-                      if (key === 'manage') {
-                        setEditing(o)
-                        setStatus(o.orderStatus ?? 'pending')
-                        setNotes(o.orderNotes ?? '')
-                        setFulfilmentCost(o.orderCost ?? null)
-                      }
-                    },
-                  }}
-                >
-                  <Button
-                    type="text"
-                    shape="circle"
-                    aria-label={`Actions for order ${o.receiptNo}`}
-                    icon={<MoreOutlined />}
-                  />
-                </Dropdown>
               ),
             },
           ]}
@@ -363,6 +491,14 @@ export function OrdersPage({
                     ]
                   : []),
                 ...payments.filter((payment) => payment.saleId === historyOrder.id),
+                ...refunds
+                  .filter((refund) => refund.saleId === historyOrder.id)
+                  .map((refund) => ({
+                    id: `refund-${refund.id}`,
+                    paidAt: refund.refundedAt,
+                    amount: -refund.amount,
+                    staffName: refund.staffName,
+                  })),
               ]}
               columns={[
                 {
@@ -370,7 +506,16 @@ export function OrdersPage({
                   dataIndex: 'paidAt',
                   render: (value: string) => dayjs(value).format('DD MMM YYYY'),
                 },
-                { title: 'Amount', dataIndex: 'amount', render: (value: number) => formatNaira(value) },
+                {
+                  title: 'Amount',
+                  dataIndex: 'amount',
+                  render: (value: number) =>
+                    value < 0 ? (
+                      <span className="text-red-600">Refund · {formatNaira(Math.abs(value))}</span>
+                    ) : (
+                      formatNaira(value)
+                    ),
+                },
                 { title: 'Recorded by', dataIndex: 'staffName', render: (value: string) => value || '—' },
               ]}
             />
@@ -389,9 +534,98 @@ export function OrdersPage({
         <Select
           className="mb-4 mt-1 w-full"
           value={status}
-          onChange={setStatus}
+          onChange={(value) => {
+            setStatus(value)
+            if (value !== 'fulfilled') setDeductFromStock(false)
+          }}
           options={statuses.map((value) => ({ value, label: value.replace('_', ' ') }))}
         />
+        {status === 'fulfilled' ? (
+          <Alert
+            className="mb-3 [&_.ant-alert-description]:mt-1 [&_.ant-alert-message]:mb-0"
+            type="warning"
+            showIcon
+            message="Fulfil from current stock?"
+            description={
+              <div className="space-y-1.5">
+                <p className="m-0 text-xs">Choose Yes only when this order should use current shop stock.</p>
+                {loadingOrderStock ? (
+                  <span className="text-xs">Checking current stock…</span>
+                ) : (
+                  <div className="space-y-0.5 text-xs">
+                    {orderStockItems.map((item) => {
+                      const required = item.quantity * item.unitsPerPackage
+                      const enough = item.availableStock >= required
+                      return (
+                        <div key={item.id} className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 truncate">{item.productName}</span>
+                          <span className={enough ? 'whitespace-nowrap' : 'whitespace-nowrap text-red-600'}>
+                            {item.availableStock} in stock · needs {required}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-4 pt-1">
+                  <span className="text-xs font-medium">Deduct from current stock</span>
+                  <Switch
+                    checked={deductFromStock}
+                    disabled={
+                      loadingOrderStock ||
+                      !orderStockItems.length ||
+                      orderStockItems.some(
+                        (item) => item.availableStock < item.quantity * item.unitsPerPackage,
+                      )
+                    }
+                    checkedChildren="Yes"
+                    unCheckedChildren="No"
+                    onChange={setDeductFromStock}
+                  />
+                </div>
+                {!loadingOrderStock &&
+                orderStockItems.some((item) => item.availableStock < item.quantity * item.unitsPerPackage) ? (
+                  <p className="m-0 text-xs text-red-600">
+                    One or more items do not have enough stock, so deduction is unavailable.
+                  </p>
+                ) : null}
+              </div>
+            }
+          />
+        ) : null}
+        {status === 'cancelled' && editing ? (
+          <Alert
+            className="mb-3 [&_.ant-alert-description]:mt-1 [&_.ant-alert-message]:mb-0"
+            type="warning"
+            showIcon
+            message="Cancel order and optionally record a refund"
+            description={
+              <div className="space-y-2">
+                <p className="m-0 text-xs">
+                  Paid {formatNaira(paidTotal(editing))} · refunded {formatNaira(refundTotal(editing))} ·
+                  available: <strong>{formatNaira(refundableAmount(editing))}</strong>
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <CurrencyInput
+                    min={0}
+                    max={refundableAmount(editing)}
+                    precision={2}
+                    placeholder="Refund amount"
+                    className="w-full"
+                    value={refundAmount ?? undefined}
+                    onChange={(value) => setRefundAmount(value ?? null)}
+                  />
+                  <DatePicker
+                    className="w-full"
+                    allowClear={false}
+                    value={dayjs(refundDate)}
+                    onChange={(value) => value && setRefundDate(value.format('YYYY-MM-DD'))}
+                  />
+                </div>
+              </div>
+            }
+          />
+        ) : null}
         <label>Delivery / pickup notes</label>
         <Input.TextArea className="mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
         <label className="mt-4 block">Actual fulfilment cost</label>

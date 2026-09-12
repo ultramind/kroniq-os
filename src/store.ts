@@ -39,25 +39,27 @@ export const usePosStore = create<PosState>((set) => ({
   replaceCart: (cart) => set({ cart }),
   addToCart: (product) =>
     set((state) => {
+      const maximumQuantity = state.paymentMethod === 'order' ? Number.MAX_SAFE_INTEGER : product.stock
       const item = state.cart.find((cartItem) => cartItem.id === product.id)
       if (item) {
         playCheckoutSound('add')
         return {
           cart: state.cart.map((cartItem) =>
             cartItem.id === product.id
-              ? { ...cartItem, quantity: Math.min(cartItem.quantity + 1, product.stock) }
+              ? { ...cartItem, quantity: Math.min(cartItem.quantity + 1, maximumQuantity) }
               : cartItem,
           ),
         }
       }
-      if (!product.stock) return state
+      if (!product.stock && state.paymentMethod !== 'order') return state
       playCheckoutSound('add')
       return { cart: [...state.cart, { ...product, quantity: 1 }] }
     }),
   addToCartQuantity: (product, quantity, agreedPrice = product.price, priceOverrideReason) =>
     set((state) => {
       const quantityToAdd = Math.max(0, Math.floor(quantity))
-      if (!quantityToAdd || !product.stock) return state
+      const maximumQuantity = state.paymentMethod === 'order' ? Number.MAX_SAFE_INTEGER : product.stock
+      if (!quantityToAdd || (!product.stock && state.paymentMethod !== 'order')) return state
       playCheckoutSound('add')
       const item = state.cart.find((cartItem) => cartItem.id === product.id)
       if (item)
@@ -69,7 +71,7 @@ export const usePosStore = create<PosState>((set) => ({
                   price: agreedPrice,
                   listPrice: cartItem.listPrice ?? product.price,
                   priceOverrideReason,
-                  quantity: Math.min(cartItem.quantity + quantityToAdd, product.stock),
+                  quantity: Math.min(cartItem.quantity + quantityToAdd, maximumQuantity),
                 }
               : cartItem,
           ),
@@ -82,7 +84,7 @@ export const usePosStore = create<PosState>((set) => ({
             price: agreedPrice,
             listPrice: product.price,
             priceOverrideReason,
-            quantity: Math.min(quantityToAdd, product.stock),
+            quantity: Math.min(quantityToAdd, maximumQuantity),
           },
         ],
       }

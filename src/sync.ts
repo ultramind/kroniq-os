@@ -167,6 +167,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
         packaging_id: item.packagingId ?? null,
         quantity: item.quantity,
         unit_price_kobo: Math.round(item.price * 100),
+        list_price_kobo: Math.round((item.listPrice ?? item.price) * 100),
         price_override_reason: item.priceOverrideReason ?? null,
       })),
       p_credit:
@@ -176,6 +177,7 @@ export async function syncOutbox(): Promise<{ synced: number; error?: string }> 
               customer_phone: sale.creditCustomerPhone,
               due_date: sale.creditDueDate,
               initial_payment_kobo: Math.round((sale.creditInitialPayment ?? 0) * 100),
+              note: sale.orderNotes ?? null,
             }
           : null,
     }

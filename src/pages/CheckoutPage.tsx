@@ -1,5 +1,5 @@
 import { CameraOutlined, ClearOutlined, SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
-import { Badge, Button, Card, Drawer, Input, Table, Tag, Typography } from 'antd'
+import { Badge, Button, Card, Drawer, Input, Table, Tag, Typography, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { InputRef } from 'antd'
 import { useEffect, useRef, useState } from 'react'
@@ -129,6 +129,7 @@ export function CheckoutPage({
   const quantityAlreadyInCart = quantityProduct
     ? (cart.find((item) => item.id === quantityProduct.id)?.quantity ?? 0)
     : 0
+  const isOrderCheckout = orderOnly || paymentMethod === 'order'
   const findExactBarcodeProduct = (code: string) => {
     const normalized = code.trim()
     return products.find((product) => product.sku.trim() === normalized)
@@ -137,16 +138,23 @@ export function CheckoutPage({
     const normalized = code.trim()
     if (!normalized) return
     const product = findExactBarcodeProduct(normalized) ?? onBarcodeLookup(normalized)
-    if (product && (orderOnly || product.stock > 0)) {
+    if (product && (isOrderCheckout || product.stock > 0)) {
       onSearchChange(normalized)
-      setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product)
+      setQuantityProduct(product)
     }
   }
   const handleSearchChange = (value: string) => {
     onSearchChange(value)
     const product = findExactBarcodeProduct(value)
-    if (product && (orderOnly || product.stock > 0))
-      setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product)
+    if (product && (isOrderCheckout || product.stock > 0)) setQuantityProduct(product)
+  }
+  const placeOrderForProduct = (product: Product) => {
+    if (cart.length && paymentMethod !== 'order') {
+      message.warning('Finish, hold, or clear the current sale before starting a customer order.')
+      return
+    }
+    onPaymentChange('order')
+    setQuantityProduct(product)
   }
   const columns: TableColumnsType<Product> = [
     {
@@ -190,6 +198,25 @@ export function CheckoutPage({
       render: (stock: number) => (
         <span className={stock < 10 ? 'font-semibold text-red-600' : 'text-slate-600'}>{stock}</span>
       ),
+    },
+    {
+      title: '',
+      key: 'order',
+      align: 'right',
+      render: (_, product) =>
+        !isOrderCheckout && product.stock <= 0 ? (
+          <Button
+            size="small"
+            type="primary"
+            className="!border-amber-500 !bg-amber-500 hover:!border-amber-400 hover:!bg-amber-400"
+            onClick={(event) => {
+              event.stopPropagation()
+              placeOrderForProduct(product)
+            }}
+          >
+            Place order
+          </Button>
+        ) : null,
     },
   ]
   const cartItemCount = cart.reduce((count, item) => count + item.quantity, 0)
@@ -322,23 +349,23 @@ export function CheckoutPage({
               }}
               scroll={{ x: 540 }}
               rowClassName={(product) =>
-                orderOnly || product.stock > 0
+                isOrderCheckout || product.stock > 0
                   ? 'checkout-product-row cursor-pointer'
                   : 'checkout-product-row cursor-not-allowed opacity-55'
               }
               onRow={(product) =>
-                orderOnly || product.stock > 0
+                isOrderCheckout || product.stock > 0
                   ? {
-                      onClick: () => setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product),
+                      onClick: () => setQuantityProduct(product),
                       onKeyDown: (event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault()
-                          setQuantityProduct(orderOnly ? { ...product, stock: 99_999 } : product)
+                          setQuantityProduct(product)
                         }
                       },
                       tabIndex: 0,
                       role: 'button',
-                      'aria-label': `Add ${product.name} to the current ${orderOnly ? 'order' : 'sale'}`,
+                      'aria-label': `Add ${product.name} to the current ${isOrderCheckout ? 'order' : 'sale'}`,
                     }
                   : { 'aria-label': `${product.name} is out of stock` }
               }
@@ -372,9 +399,12 @@ export function CheckoutPage({
       </Drawer>
       <QuantityKeypadModal
         product={quantityProduct}
-        maxQuantity={Math.max(0, (quantityProduct?.stock ?? 0) - quantityAlreadyInCart)}
+        maxQuantity={
+          isOrderCheckout ? 99_999 : Math.max(0, (quantityProduct?.stock ?? 0) - quantityAlreadyInCart)
+        }
         role={role}
         flexiblePricingEnabled={flexiblePricingEnabled}
+        isOrder={isOrderCheckout}
         open={Boolean(quantityProduct)}
         onClose={() => {
           setQuantityProduct(undefined)

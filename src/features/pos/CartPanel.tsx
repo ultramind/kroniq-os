@@ -58,6 +58,7 @@ type Props = {
     customerPhone: string
     dueDate?: string
     initialPayment?: number
+    note?: string
   }) => void
   onHistoricalCheckout?: (
     credit:
@@ -100,6 +101,7 @@ export function CartPanel({
   const [creditCustomerPhone, setCreditCustomerPhone] = useState('')
   const [creditDueDate, setCreditDueDate] = useState('')
   const [creditInitialPayment, setCreditInitialPayment] = useState<number | null>(null)
+  const [orderNote, setOrderNote] = useState('')
   const [creditModalOpen, setCreditModalOpen] = useState(false)
   const [creditError, setCreditError] = useState('')
   const [clientForm] = Form.useForm()
@@ -117,12 +119,14 @@ export function CartPanel({
   const availableMethods = orderOnly ? methods.filter((method) => method.id === 'order') : methods
   const creditDetailsMissing =
     needsClientDetails && (!creditCustomerName.trim() || !creditCustomerPhone.trim())
+  const cartRequiresOrder = cart.some((item) => item.stock <= 0 || item.quantity > item.stock)
 
   function resetCreditDetails() {
     setCreditCustomerName('')
     setCreditCustomerPhone('')
     setCreditDueDate('')
     setCreditInitialPayment(null)
+    setOrderNote('')
     setSelectedCreditorKey(undefined)
     setCreditError('')
     clientForm.resetFields()
@@ -155,6 +159,7 @@ export function CartPanel({
       customerPhone: creditCustomerPhone,
       initialPayment: creditInitialPayment,
       dueDate: creditDueDate ? dayjs(creditDueDate) : undefined,
+      orderNote,
     })
 
     void (async () => {
@@ -328,7 +333,7 @@ export function CartPanel({
                   size="middle"
                   className="touch-target"
                   icon={<PlusOutlined />}
-                  disabled={item.quantity >= item.stock}
+                  disabled={paymentMethod !== 'order' && item.quantity >= item.stock}
                   onClick={() => onQuantityChange(item.id, item.quantity + 1)}
                 />
               </Space.Compact>
@@ -424,6 +429,7 @@ export function CartPanel({
             danger={method.id === 'credit'}
             className={`touch-target text-base active:scale-[0.98] ${method.id === 'credit' && paymentMethod === method.id ? '!bg-red-600 !text-white hover:!bg-red-500' : ''} ${method.id === 'order' && paymentMethod === method.id ? '!border-amber-500 !bg-amber-500 !text-white hover:!bg-amber-400' : ''}`}
             type={paymentMethod === method.id ? 'primary' : 'default'}
+            disabled={cartRequiresOrder && method.id !== 'order'}
             onClick={() => selectPaymentMethod(method.id)}
           >
             {method.label}
@@ -548,6 +554,7 @@ export function CartPanel({
                 customerPhone: creditCustomerPhone.trim(),
                 dueDate: creditDueDate || undefined,
                 initialPayment: creditInitialPayment ?? 0,
+                note: paymentMethod === 'order' ? orderNote.trim() || undefined : undefined,
               }
             : undefined
           if (isHistorical) onHistoricalCheckout?.(credit, saleDate, deductStock)
@@ -693,6 +700,24 @@ export function CartPanel({
                 className="w-full"
               />
             </Form.Item>
+            {paymentMethod === 'order' && (
+              <Form.Item
+                name="orderNote"
+                label={
+                  <>
+                    Order note <span className="font-normal text-slate-400">(optional)</span>
+                  </>
+                }
+                className="mb-0"
+              >
+                <Input.TextArea
+                  value={orderNote}
+                  onChange={(event) => setOrderNote(event.target.value)}
+                  placeholder="Custom features, changes, delivery instructions, or other client requests"
+                  rows={3}
+                />
+              </Form.Item>
+            )}
           </div>
         </Form>
       </Modal>

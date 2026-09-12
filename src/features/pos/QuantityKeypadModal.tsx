@@ -10,6 +10,7 @@ type Props = {
   open: boolean
   role: Role
   flexiblePricingEnabled: boolean
+  isOrder?: boolean
   onClose: () => void
   onConfirm: (
     quantity: number,
@@ -25,6 +26,7 @@ export function QuantityKeypadModal({
   open,
   role,
   flexiblePricingEnabled,
+  isOrder = false,
   onClose,
   onConfirm,
 }: Props) {
@@ -54,7 +56,7 @@ export function QuantityKeypadModal({
   )
   const requiresReason = priceChanged && role !== 'cashier' && belowFloor
   const availableQuantity =
-    selectedPack && product ? Math.floor(product.stock / selectedPack.unitsPerPack) : maxQuantity
+    isOrder || !selectedPack || !product ? maxQuantity : Math.floor(product.stock / selectedPack.unitsPerPack)
   const quantityValid = Number.isInteger(quantity) && quantity > 0 && quantity <= availableQuantity
   const priceValid =
     Number.isFinite(agreedPrice) &&
@@ -73,15 +75,22 @@ export function QuantityKeypadModal({
     setActiveValue((current) => (current + digit).replace(/^0+(?=\d)/, '').slice(0, editingPrice ? 8 : 5))
   if (!product) return null
   return (
-    <Modal open={open} title="Add to current sale" footer={null} onCancel={onClose} destroyOnClose>
+    <Modal
+      open={open}
+      title={isOrder ? 'Add to customer order' : 'Add to current sale'}
+      footer={null}
+      onCancel={onClose}
+      destroyOnClose
+    >
       <div className="mb-4">
         <Typography.Text strong className="block text-base">
           {product.name}
         </Typography.Text>
         <Typography.Text type="secondary">
           Default {formatNaira(activePrice)} ·{' '}
-          {selectedPack ? Math.floor(product.stock / selectedPack.unitsPerPack) : maxQuantity} available to
-          add
+          {isOrder
+            ? 'Available to order'
+            : `${selectedPack ? Math.floor(product.stock / selectedPack.unitsPerPack) : maxQuantity} available to add`}
         </Typography.Text>
       </div>
       {!!product.packages?.length && (

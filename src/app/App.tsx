@@ -226,7 +226,7 @@ export function App({
       } else api.warning(`No product found for SKU/barcode: ${code}`)
       return
     }
-    if (!product.stock) {
+    if (!product.stock && state.paymentMethod !== 'order') {
       api.warning(`${product.name} is out of stock.`)
       return
     }
@@ -291,12 +291,14 @@ export function App({
             packaging_id: item.packagingId ?? null,
             quantity: item.quantity,
             unit_price_kobo: Math.round(item.price * 100),
+            list_price_kobo: Math.round((item.listPrice ?? item.price) * 100),
           })),
           p_credit: {
             customer_name: credit.customerName.trim(),
             customer_phone: credit.customerPhone.trim(),
             due_date: credit.dueDate,
             initial_payment_kobo: Math.round((credit.initialPayment ?? 0) * 100),
+            note: credit.note,
           },
         })
         if (error) throw error
@@ -343,6 +345,7 @@ export function App({
         creditCustomerPhone: credit?.customerPhone,
         creditDueDate: credit?.dueDate,
         creditInitialPayment: credit?.initialPayment ?? 0,
+        orderNotes: state.paymentMethod === 'order' ? credit?.note?.trim() || undefined : undefined,
         orderStatus: state.paymentMethod === 'order' ? 'pending' : undefined,
       }
       await db.transaction('rw', db.sales, db.saleItems, async () => {

@@ -10,7 +10,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ServiceDashboard } from '../features/services/ServiceDashboard'
 import { ShareContentButton } from '../components/ShareContentButton'
 
-type Period = 'day' | 'week' | 'month' | 'year'
+type Period = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
 type RemoteExpense = { id: string; amount: number; spentAt: string; description: string }
 type RemotePayment = { id: string; amount: number; paidAt: string }
 type RemoteOrderPayment = { saleId: string; amount: number }
@@ -29,6 +29,11 @@ function rangeFor(period: Period, anchor: string) {
     start.setDate(1)
     end.setMonth(date.getMonth() + 1, 0)
   }
+  if (period === 'quarter') {
+    const quarterStartMonth = Math.floor(date.getMonth() / 3) * 3
+    start.setMonth(quarterStartMonth, 1)
+    end.setMonth(quarterStartMonth + 3, 0)
+  }
   if (period === 'year') {
     start.setMonth(0, 1)
     end.setMonth(11, 31)
@@ -38,6 +43,10 @@ function rangeFor(period: Period, anchor: string) {
 export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: Role; staffName?: string }) {
   const [period, setPeriod] = useState<Period>('day')
   const [anchor, setAnchor] = useState(new Date().toISOString().slice(0, 10))
+  const [customRange, setCustomRange] = useState<[string, string]>(() => {
+    const today = dayjs()
+    return [today.startOf('month').format('YYYY-MM-DD'), today.endOf('month').format('YYYY-MM-DD')]
+  })
   const [expenses, setExpenses] = useState<RemoteExpense[]>([])
   const [payments, setPayments] = useState<RemotePayment[]>([])
   const [orderPayments, setOrderPayments] = useState<RemoteOrderPayment[]>([])
@@ -48,7 +57,8 @@ export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: R
   const returns = useLiveQuery(() => db.returnActivities.toArray(), []) ?? []
   const shifts = useLiveQuery(() => db.shifts.toArray(), []) ?? []
   const saleItems = useLiveQuery(() => db.saleItems.toArray(), []) ?? []
-  const { start, end } = rangeFor(period, anchor)
+  const { start, end } =
+    period === 'custom' ? { start: customRange[0], end: customRange[1] } : rangeFor(period, anchor)
   useEffect(() => {
     void (async () => {
       if (!supabase) return
@@ -643,18 +653,33 @@ export function SummaryPage({ sales, role, staffName }: { sales: Sale[]; role: R
             value={period}
             onChange={setPeriod}
             options={[
-              { value: 'day', label: 'Day' },
-              { value: 'week', label: 'Week' },
-              { value: 'month', label: 'Month' },
-              { value: 'year', label: 'Year' },
+              { value: 'day', label: 'Daily' },
+              { value: 'week', label: 'Weekly' },
+              { value: 'month', label: 'Monthly' },
+              { value: 'quarter', label: 'Quarterly' },
+              { value: 'year', label: 'Yearly' },
+              { value: 'custom', label: 'Date range' },
             ]}
           />
-          <DatePicker
-            value={dayjs(anchor)}
-            allowClear={false}
-            format="DD MMM YYYY"
-            onChange={(value) => value && setAnchor(value.format('YYYY-MM-DD'))}
-          />
+          {period === 'custom' ? (
+            <DatePicker.RangePicker
+              allowClear={false}
+              format="DD MMM YYYY"
+              value={[dayjs(customRange[0]), dayjs(customRange[1])]}
+              onChange={(values) => {
+                if (values?.[0] && values[1]) {
+                  setCustomRange([values[0].format('YYYY-MM-DD'), values[1].format('YYYY-MM-DD')])
+                }
+              }}
+            />
+          ) : (
+            <DatePicker
+              value={dayjs(anchor)}
+              allowClear={false}
+              format="DD MMM YYYY"
+              onChange={(value) => value && setAnchor(value.format('YYYY-MM-DD'))}
+            />
+          )}
           <Button icon={<PrinterOutlined />} onClick={() => window.print()}>
             Print
           </Button>
