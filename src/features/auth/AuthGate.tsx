@@ -78,6 +78,13 @@ export function AuthGate() {
     recoverySearch.get('type') === 'recovery' ||
     recoveryHash.get('type') === 'recovery'
   const publicStorefrontRoute = pathname.startsWith('/shop/')
+  const hostname = window.location.hostname.toLowerCase()
+  const customDomainStorefrontRoute =
+    hostname !== 'localhost' &&
+    hostname !== '127.0.0.1' &&
+    hostname !== 'kroniqos.com' &&
+    hostname !== 'www.kroniqos.com' &&
+    !hostname.endsWith('.vercel.app')
   const publicMarketingRoute =
     pathname === '/' ||
     pathname === '/product' ||
@@ -468,7 +475,7 @@ export function AuthGate() {
     })
     return () => listener.subscription.unsubscribe()
   }, [forgotPasswordRoute, platformRoute, publicStorefrontRoute, resetPasswordRoute])
-  if (publicStorefrontRoute)
+  if (publicStorefrontRoute || customDomainStorefrontRoute)
     return (
       <Suspense fallback={<AppLoading />}>
         <StorefrontPage />

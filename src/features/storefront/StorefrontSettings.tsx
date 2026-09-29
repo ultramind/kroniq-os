@@ -1,5 +1,5 @@
-import { CopyOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Form, Image, Input, Radio, Switch, Upload, message } from 'antd'
+import { CopyOutlined, DeleteOutlined, GlobalOutlined, UploadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Form, Image, Input, Radio, Switch, Tag, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabase'
 
@@ -21,6 +21,26 @@ type Values = {
   trustStats?: Array<{ value?: string; label?: string }>
 }
 
+type CustomDomain = {
+  id: string
+  domain: string
+  status: 'requested' | 'dns_required' | 'verifying' | 'active' | 'failed'
+  dns_record_type?: string | null
+  dns_record_name?: string | null
+  dns_record_value?: string | null
+  failure_message?: string | null
+  requested_at: string
+  verified_at?: string | null
+}
+
+const domainStatus: Record<CustomDomain['status'], { color: string; label: string }> = {
+  requested: { color: 'gold', label: 'Awaiting platform review' },
+  dns_required: { color: 'gold', label: 'DNS action required' },
+  verifying: { color: 'blue', label: 'Verifying DNS' },
+  active: { color: 'green', label: 'Connected' },
+  failed: { color: 'red', label: 'Needs attention' },
+}
+
 export function StorefrontSettings() {
   const [form] = Form.useForm<Values>()
   const [api, holder] = message.useMessage()
@@ -30,6 +50,10 @@ export function StorefrontSettings() {
   const [storeId, setStoreId] = useState<string>()
   const [storeName, setStoreName] = useState('')
   const [canUseLogo, setCanUseLogo] = useState(false)
+  const [canUseCustomDomains, setCanUseCustomDomains] = useState(false)
+  const [customDomain, setCustomDomain] = useState<CustomDomain>()
+  const [requestedDomain, setRequestedDomain] = useState('')
+  const [requestingDomain, setRequestingDomain] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
@@ -53,16 +77,22 @@ export function StorefrontSettings() {
           .maybeSingle(),
       ])
       if (storeResult.data) {
-        const [organizationResult, brandingEntitlementResult] = await Promise.all([
-          supabase
-            .from('organizations')
-            .select('name')
-            .eq('id', storeResult.data.organization_id)
-            .maybeSingle(),
-          supabase.rpc('current_store_has_entitlement', { p_entitlement: 'storefront_branding' }),
-        ])
+        const [organizationResult, brandingEntitlementResult, customDomainEntitlementResult, domainResult] =
+          await Promise.all([
+            supabase
+              .from('organizations')
+              .select('name')
+              .eq('id', storeResult.data.organization_id)
+              .maybeSingle(),
+            supabase.rpc('current_store_has_entitlement', { p_entitlement: 'storefront_branding' }),
+            supabase.rpc('current_store_has_entitlement', { p_entitlement: 'custom_domains' }),
+            supabase.rpc('current_storefront_custom_domain'),
+          ])
         setStoreName(organizationResult.data?.name ?? '')
         setCanUseLogo(Boolean(brandingEntitlementResult.data))
+        setCanUseCustomDomains(Boolean(customDomainEntitlementResult.data))
+        if (!domainResult.error)
+          setCustomDomain((domainResult.data?.[0] ?? undefined) as CustomDomain | undefined)
       }
       if (storefrontResult.data)
         form.setFieldsValue({
@@ -166,6 +196,24 @@ export function StorefrontSettings() {
     }
   }
 
+  async function requestCustomDomain() {
+    if (!supabase) return
+    setRequestingDomain(true)
+    try {
+      const { data, error } = await supabase.rpc('request_current_storefront_domain', {
+        p_domain: requestedDomain,
+      })
+      if (error) throw error
+      setCustomDomain((data?.[0] ?? undefined) as CustomDomain | undefined)
+      setRequestedDomain('')
+      api.success('Custom domain request sent to the Kroniqos platform team.')
+    } catch (error) {
+      api.error(error instanceof Error ? error.message : 'Could not request the custom domain.')
+    } finally {
+      setRequestingDomain(false)
+    }
+  }
+
   return (
     <Card title="Online storefront" className="w-full xl:w-1/2">
       {holder}
@@ -258,6 +306,71 @@ export function StorefrontSettings() {
             )
           }}
         </Form.Item>
+        {canUseCustomDomains && (
+          <div className="mb-6 border border-slate-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="font-medium text-[#0B1121]">Custom domain</div>
+                <p className="mb-0 mt-1 text-xs text-slate-500">
+                  The Kroniqos platform team connects and verifies your domain for you.
+                </p>
+              </div>
+              {customDomain && (
+                <Tag color={domainStatus[customDomain.status].color}>
+                  {domainStatus[customDomain.status].label}
+                </Tag>
+              )}
+            </div>
+            {customDomain ? (
+              <div className="space-y-3">
+                <Input value={customDomain.domain} prefix={<GlobalOutlined />} readOnly />
+                {customDomain.status === 'dns_required' && customDomain.dns_record_value && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message="Update your domain DNS"
+                    description={
+                      <div className="mt-1 text-xs">
+                        <div>
+                          Add a {customDomain.dns_record_type ?? 'DNS'} record named{' '}
+                          <strong>{customDomain.dns_record_name || '@'}</strong> with value{' '}
+                          <strong>{customDomain.dns_record_value}</strong>.
+                        </div>
+                      </div>
+                    }
+                  />
+                )}
+                {customDomain.status === 'failed' && customDomain.failure_message && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message="Domain needs attention"
+                    description={customDomain.failure_message}
+                  />
+                )}
+                <p className="mb-0 text-xs text-slate-500">
+                  Need a different domain? Submit a new request below and the platform team will review it.
+                </p>
+              </div>
+            ) : null}
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={requestedDomain}
+                onChange={(event) => setRequestedDomain(event.target.value)}
+                placeholder="e.g. kohaels.com"
+                inputMode="url"
+              />
+              <Button
+                type="primary"
+                loading={requestingDomain}
+                disabled={!requestedDomain.trim()}
+                onClick={() => void requestCustomDomain()}
+              >
+                {customDomain ? 'Request change' : 'Request domain'}
+              </Button>
+            </div>
+          </div>
+        )}
         <Form.Item name="headline" label="Headline">
           <Input placeholder="Fresh groceries, delivered with care." />
         </Form.Item>

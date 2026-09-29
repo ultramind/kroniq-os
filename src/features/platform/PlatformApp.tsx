@@ -52,6 +52,7 @@ import { PlatformAnalyticsPage, PlatformAuditLogPage } from './PlatformObservabi
 import { PlatformOperationsPage, PlatformStatusPage, PlatformSupportPage } from './PlatformSupportOps'
 import { PlatformDashboard } from './PlatformDashboard'
 import { PlatformTeamPage } from './PlatformTeam'
+import { PlatformCustomDomains } from './PlatformCustomDomains'
 
 type OrganizationStatus = 'trial' | 'active' | 'suspended' | 'cancelled'
 type Organization = {
@@ -623,6 +624,7 @@ function OrganizationDetail({
               )}
             />
           </Card>
+          <PlatformCustomDomains organizationId={organization.id} />
         </div>
         <Card
           title={

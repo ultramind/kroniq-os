@@ -75,21 +75,57 @@ function productImage(product: Product) {
 export function StorefrontPage() {
   const { mode } = useTheme()
   const { pathname } = useLocation()
-  const [, slug = '', section, productId] = pathname.split('/').filter(Boolean)
+  const pathSegments = pathname.split('/').filter(Boolean)
+  const hostname = window.location.hostname.toLowerCase()
+  const customDomainHost =
+    hostname !== 'localhost' &&
+    hostname !== '127.0.0.1' &&
+    hostname !== 'kroniqos.com' &&
+    hostname !== 'www.kroniqos.com' &&
+    !hostname.endsWith('.vercel.app')
+  const [, routeSlug = '', routeSection, routeProductId] = pathSegments
+  const [customDomainSlug, setCustomDomainSlug] = useState<string>()
+  const [customDomainResolved, setCustomDomainResolved] = useState(!customDomainHost)
+  const slug = customDomainHost ? (customDomainSlug ?? '') : routeSlug
+  const section = customDomainHost ? pathSegments[0] : routeSection
+  const productId = customDomainHost ? pathSegments[1] : routeProductId
   const [store, setStore] = useState<Storefront>()
   const [products, setProducts] = useState<Product[]>([])
   const [sections, setSections] = useState<Section[]>([])
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const baseUrl = `/shop/${slug}`
+  const baseUrl = customDomainHost ? '' : `/shop/${slug}`
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === productId),
     [productId, products],
   )
 
   useEffect(() => {
+    if (!customDomainHost || !supabase) return
+    let cancelled = false
+    setCustomDomainResolved(false)
+    setCustomDomainSlug(undefined)
+    void (async () => {
+      try {
+        const { data } = await supabase.rpc('public_storefront_slug_by_domain', { p_domain: hostname })
+        if (!cancelled) setCustomDomainSlug((data?.[0] as { slug?: string } | undefined)?.slug)
+      } finally {
+        if (!cancelled) setCustomDomainResolved(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [customDomainHost, hostname])
+
+  useEffect(() => {
     if (!supabase) return
+    if (!customDomainResolved) return
+    if (!slug) {
+      setLoading(false)
+      return
+    }
     const client = supabase
     let cancelled = false
     setLoading(true)
@@ -128,7 +164,7 @@ export function StorefrontPage() {
     return () => {
       cancelled = true
     }
-  }, [slug])
+  }, [customDomainResolved, slug])
 
   if (loading)
     return (
@@ -199,7 +235,7 @@ export function StorefrontPage() {
     >
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
-          <Link to={baseUrl} className="flex min-w-0 items-center gap-2 font-semibold text-[#0B1121]">
+          <Link to={baseUrl || '/'} className="flex min-w-0 items-center gap-2 font-semibold text-[#0B1121]">
             {store.logo_url ? (
               <img
                 src={store.logo_url}
@@ -217,7 +253,7 @@ export function StorefrontPage() {
             <span className="truncate">{store.store_name}</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium sm:flex">
-            <Link className="text-slate-600 transition hover:text-[#0B1121]" to={baseUrl}>
+            <Link className="text-slate-600 transition hover:text-[#0B1121]" to={baseUrl || '/'}>
               Shop
             </Link>
             <Link className="text-slate-600 transition hover:text-[#0B1121]" to={`${baseUrl}/about`}>
@@ -256,7 +292,7 @@ export function StorefrontPage() {
             <div className="mx-auto grid max-w-7xl gap-1">
               <Link
                 className="px-3 py-3 text-sm font-medium text-slate-700"
-                to={baseUrl}
+                to={baseUrl || '/'}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Shop
@@ -783,7 +819,7 @@ function StorefrontPageHero({
       <div className="absolute inset-0 -z-10 bg-black/20" />
       <div className="mx-auto max-w-7xl px-5 py-14 sm:py-16">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-white/75">
-          <Link to={baseUrl} className="transition hover:text-white">
+          <Link to={baseUrl || '/'} className="transition hover:text-white">
             Home
           </Link>
           <RightOutlined className="text-[10px]" />
@@ -813,7 +849,7 @@ function ProductPage({
     return (
       <section className="grid flex-1 place-items-center px-5 py-20">
         <Empty description="This product is unavailable.">
-          <Link to={baseUrl}>
+          <Link to={baseUrl || '/'}>
             <Button>Back to shop</Button>
           </Link>
         </Empty>
@@ -827,7 +863,7 @@ function ProductPage({
   const mainImage = selectedImage && images.includes(selectedImage) ? selectedImage : images[0]
   return (
     <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:py-16">
-      <Link to={baseUrl} className="text-sm font-medium text-slate-600">
+      <Link to={baseUrl || '/'} className="text-sm font-medium text-slate-600">
         <ArrowLeftOutlined /> Back to shop
       </Link>
       <div className="mt-8 grid gap-10 lg:grid-cols-2">
