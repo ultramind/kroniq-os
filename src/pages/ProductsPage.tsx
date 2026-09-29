@@ -18,6 +18,7 @@ export function ProductsPage({
     product: Product,
     values: {
       name: string
+      category: string
       sku: string
       price: number
       costPrice: number

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
+  AutoComplete,
   Button,
   Card,
   Dropdown,
@@ -38,9 +39,10 @@ import { CurrencyInput } from '../../components/CurrencyInput'
 import { generateInternalBarcode } from '../../lib/barcode'
 
 const { Text } = Typography
-const MAX_IMAGES = 2
+const MAX_IMAGES = 3
 type Values = {
   name: string
+  category: string
   sku: string
   price: number
   costPrice: number
@@ -75,6 +77,13 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
         `${product.name} ${product.sku}`.toLowerCase().includes(search.toLowerCase()),
       ),
     [products, search],
+  )
+  const categoryOptions = useMemo(
+    () =>
+      [...new Set(products.map((product) => product.category.trim()).filter(Boolean))]
+        .sort((first, second) => first.localeCompare(second))
+        .map((category) => ({ value: category })),
+    [products],
   )
 
   function currentImages(): string[] {
@@ -148,6 +157,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
     setEditing(product)
     form.setFieldsValue({
       name: product.name,
+      category: product.category,
       sku: product.sku,
       price: product.price,
       costPrice: product.costPrice,
@@ -373,6 +383,26 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
             <Input size="large" />
           </Form.Item>
           <Form.Item
+            name="category"
+            label="Category"
+            rules={[
+              { required: true, message: 'Enter or select a category.' },
+              { whitespace: true, message: 'Enter or select a category.' },
+            ]}
+          >
+            <AutoComplete
+              options={categoryOptions}
+              filterOption={(input, option) =>
+                String(option?.value ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }
+              placeholder="Select or enter a category"
+            >
+              <Input size="large" />
+            </AutoComplete>
+          </Form.Item>
+          <Form.Item
             name="sku"
             label="SKU / barcode"
             extra="Use the supplier barcode, or generate a unique internal Code 128 barcode."
@@ -458,7 +488,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
                     )}
                   </div>
                   <Text type="secondary" className="mt-2 block text-xs">
-                    Maximum 2 images per product. Each image can be up to 5 MB.
+                    Maximum 3 images per product. Each image can be up to 5 MB.
                   </Text>
                 </div>
               )

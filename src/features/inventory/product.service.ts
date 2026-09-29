@@ -4,6 +4,7 @@ import type { Product } from '../../types'
 
 export type ProductDetails = Pick<
   Product,
+  | 'category'
   | 'name'
   | 'sku'
   | 'price'
@@ -39,11 +40,12 @@ export async function manageProductLifecycle(product: Product, action: ProductLi
 export async function updateProductDetails(product: Product, details: ProductDetails) {
   if (supabase) {
     if (!navigator.onLine) throw new Error('Product changes require an internet connection.')
-    const imageUrls = (details.imageUrls ?? (details.imageUrl ? [details.imageUrl] : [])).slice(0, 2)
+    const imageUrls = (details.imageUrls ?? (details.imageUrl ? [details.imageUrl] : [])).slice(0, 3)
     const { error } = await supabase.rpc('update_product_details', {
       p_product_id: product.id,
       p_product: {
         name: details.name.trim().toUpperCase(),
+        category_name: details.category.trim(),
         sku: details.sku,
         price_kobo: Math.round(details.price * 100),
         cost_price_kobo: Math.round(details.costPrice * 100),

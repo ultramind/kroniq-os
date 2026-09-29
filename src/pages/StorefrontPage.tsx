@@ -2,6 +2,7 @@ import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
   CloseOutlined,
+  CloudSyncOutlined,
   EnvironmentOutlined,
   MenuOutlined,
   PhoneOutlined,
@@ -11,11 +12,13 @@ import {
   StarFilled,
   WhatsAppOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Skeleton, Tag } from 'antd'
+import { Button, Empty, Input, Tag } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { formatNaira } from '../lib/currency'
+import { initials } from '../lib/initials'
 import { supabase } from '../supabase'
+import { useTheme } from '../app/theme'
 
 type Storefront = {
   store_name: string
@@ -43,6 +46,7 @@ type Product = {
   category?: string
   is_featured?: boolean
   published_at?: string
+  in_stock?: boolean
 }
 type Section = {
   id: string
@@ -69,6 +73,7 @@ function productImage(product: Product) {
 }
 
 export function StorefrontPage() {
+  const { mode } = useTheme()
   const { pathname } = useLocation()
   const [, slug = '', section, productId] = pathname.split('/').filter(Boolean)
   const [store, setStore] = useState<Storefront>()
@@ -85,14 +90,25 @@ export function StorefrontPage() {
 
   useEffect(() => {
     if (!supabase) return
+    const client = supabase
+    let cancelled = false
     setLoading(true)
-    void Promise.all([
-      supabase.rpc('public_storefront', { p_slug: slug }),
-      supabase.rpc('public_storefront_products', { p_slug: slug }),
-      supabase.rpc('public_storefront_sections', { p_slug: slug }),
-      supabase.rpc('public_storefront_testimonials', { p_slug: slug }),
-    ]).then(([storeResult, productResult, sectionResult, testimonialResult]) => {
-      setStore(storeResult.data?.[0] as Storefront | undefined)
+    setStore(undefined)
+    const load = async () => {
+      const storeResult = await client.rpc('public_storefront', { p_slug: slug })
+      if (cancelled) return
+      const storefront = storeResult.data?.[0] as Storefront | undefined
+      setStore(storefront)
+      if (!storefront) {
+        setLoading(false)
+        return
+      }
+      const [productResult, sectionResult, testimonialResult] = await Promise.all([
+        client.rpc('public_storefront_products', { p_slug: slug }),
+        client.rpc('public_storefront_sections', { p_slug: slug }),
+        client.rpc('public_storefront_testimonials', { p_slug: slug }),
+      ])
+      if (cancelled) return
       setProducts((productResult.data ?? []) as Product[])
       setSections(
         (sectionResult.data ?? []).map((item: Section & { display_position?: number }) => ({
@@ -107,14 +123,44 @@ export function StorefrontPage() {
         })) as Testimonial[],
       )
       setLoading(false)
-    })
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [slug])
 
   if (loading)
     return (
-      <div className="mx-auto max-w-7xl p-6">
-        <Skeleton active />
-      </div>
+      <main
+        className={`kroniq-loader kroniq-loader--${mode} grid min-h-screen place-items-center overflow-hidden p-6`}
+      >
+        <div className="relative w-full max-w-sm text-center">
+          <div className="kroniq-loader-orb absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2" />
+          {store?.logo_url ? (
+            <img
+              src={store.logo_url}
+              alt={`${store.store_name} logo`}
+              className="relative mx-auto mb-4 h-12 w-12 object-contain"
+            />
+          ) : (
+            <span className="relative mx-auto mb-4 grid h-12 w-12 place-items-center bg-[#0B1121] text-sm font-bold text-white">
+              {initials(store?.store_name ?? 'Kroniqos')}
+            </span>
+          )}
+          <h1 className="kroniq-loader-title relative mb-1 text-xl font-semibold">
+            {store?.store_name ?? 'Kroniqos'}
+          </h1>
+          <p className="kroniq-loader-subtitle relative m-0 text-sm">Loading online store</p>
+          <div className="kroniq-loader-track relative mx-auto mt-4 h-px w-44 overflow-hidden">
+            <span className="kroniq-loader-line block h-full w-1/2" />
+          </div>
+          <div className="kroniq-loader-status relative mt-2 flex items-center justify-center gap-2 text-[11px]">
+            <CloudSyncOutlined className="kroniq-loader-spin" />
+            Powered by AMT
+          </div>
+        </div>
+      </main>
     )
   if (!store)
     return (
@@ -760,6 +806,9 @@ function ProductPage({
   baseUrl: string
   actions: React.ReactNode
 }) {
+  const [selectedImage, setSelectedImage] = useState<string>()
+  useEffect(() => setSelectedImage(undefined), [product?.id])
+
   if (!product)
     return (
       <section className="grid flex-1 place-items-center px-5 py-20">
@@ -775,6 +824,7 @@ function ProductPage({
     : product.image_url
       ? [product.image_url]
       : []
+  const mainImage = selectedImage && images.includes(selectedImage) ? selectedImage : images[0]
   return (
     <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:py-16">
       <Link to={baseUrl} className="text-sm font-medium text-slate-600">
@@ -782,12 +832,26 @@ function ProductPage({
       </Link>
       <div className="mt-8 grid gap-10 lg:grid-cols-2">
         <div className="aspect-square overflow-hidden bg-slate-100">
-          {images[0] ? (
-            <img className="h-full w-full object-cover" src={images[0]} alt={product.name} />
+          {mainImage ? (
+            <img
+              key={mainImage}
+              className="storefront-product-main-image h-full w-full object-cover"
+              src={mainImage}
+              alt={product.name}
+            />
           ) : (
             <div className="grid h-full place-items-center text-slate-400">No product image</div>
           )}
         </div>
+        {images.length > 1 && (
+          <ProductImageThumbnails
+            className="mt-3 sm:hidden"
+            images={images}
+            productName={product.name}
+            mainImage={mainImage}
+            onSelect={setSelectedImage}
+          />
+        )}
         <div className="lg:py-8">
           <Tag className="!m-0">{product.category || 'Products'}</Tag>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">{product.name}</h1>
@@ -797,21 +861,53 @@ function ProductPage({
               `${product.name} is available from ${store.store_name}. Contact us to confirm availability.`}
           </p>
           {images.length > 1 && (
-            <div className="mt-7 flex gap-3">
-              {images.slice(1).map((image) => (
-                <img
-                  key={image}
-                  className="h-20 w-20 border border-slate-200 object-cover"
-                  src={image}
-                  alt={`${product.name} alternate view`}
-                />
-              ))}
-            </div>
+            <ProductImageThumbnails
+              className="mt-7 hidden sm:flex"
+              images={images}
+              productName={product.name}
+              mainImage={mainImage}
+              onSelect={setSelectedImage}
+            />
           )}
           <div className="mt-10">{actions}</div>
         </div>
       </div>
     </section>
+  )
+}
+
+function ProductImageThumbnails({
+  images,
+  productName,
+  mainImage,
+  onSelect,
+  className,
+}: {
+  images: string[]
+  productName: string
+  mainImage?: string
+  onSelect: (image: string) => void
+  className?: string
+}) {
+  return (
+    <div className={`flex gap-3 ${className ?? ''}`}>
+      {images.map((image, index) => (
+        <button
+          key={`${image}-${index}`}
+          type="button"
+          aria-label={`Show product image ${index + 1}`}
+          aria-pressed={mainImage === image}
+          className={`h-20 w-20 overflow-hidden border transition ${
+            mainImage === image
+              ? 'border-[#0B1121] ring-1 ring-[#0B1121]'
+              : 'border-slate-200 hover:border-slate-400'
+          }`}
+          onClick={() => onSelect(image)}
+        >
+          <img className="h-full w-full object-cover" src={image} alt={`${productName} view ${index + 1}`} />
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -846,9 +942,15 @@ function ProductCard({ product, href }: { product: Product; href: string }) {
           <p className="m-0 truncate text-sm font-bold text-[#0B1121] sm:text-base">
             {formatNaira(product.price_kobo / 100)}
           </p>
-          <span className="grid h-7 w-7 shrink-0 place-items-center border border-slate-200 text-xs text-slate-500 transition group-hover:border-[#0B1121] group-hover:bg-[#0B1121] group-hover:text-white">
-            <RightOutlined />
-          </span>
+          {product.in_stock === false ? (
+            <span className="text-right text-[10px] font-semibold leading-4 text-amber-700">
+              Out of stock
+            </span>
+          ) : (
+            <span className="grid h-7 w-7 shrink-0 place-items-center border border-slate-200 text-xs text-slate-500 transition group-hover:border-[#0B1121] group-hover:bg-[#0B1121] group-hover:text-white">
+              <RightOutlined />
+            </span>
+          )}
         </div>
       </div>
     </Link>
