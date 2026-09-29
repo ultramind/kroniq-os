@@ -1,5 +1,6 @@
 import { App as AntApp, ConfigProvider, theme as antdTheme } from 'antd'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 
 type ThemeMode = 'light' | 'dark'
 type ThemeContextValue = { mode: ThemeMode; toggleTheme: () => void }
@@ -21,14 +22,30 @@ const sharedTokens = {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(
+  const { pathname } = useLocation()
+  const [savedMode, setMode] = useState<ThemeMode>(
     () => (localStorage.getItem('naira-pos-theme') as ThemeMode) || 'light',
   )
+  const marketingRoute =
+    pathname === '/' ||
+    pathname === '/product' ||
+    pathname === '/pricing' ||
+    pathname === '/about' ||
+    pathname === '/contact' ||
+    pathname === '/help' ||
+    pathname === '/privacy' ||
+    pathname === '/terms' ||
+    pathname === '/status' ||
+    pathname.startsWith('/solutions/')
+  const mode: ThemeMode = marketingRoute ? 'light' : savedMode
 
   useEffect(() => {
     document.documentElement.dataset.theme = mode
-    localStorage.setItem('naira-pos-theme', mode)
   }, [mode])
+
+  useEffect(() => {
+    localStorage.setItem('naira-pos-theme', savedMode)
+  }, [savedMode])
 
   const value = useMemo(
     () => ({ mode, toggleTheme: () => setMode((current) => (current === 'light' ? 'dark' : 'light')) }),
