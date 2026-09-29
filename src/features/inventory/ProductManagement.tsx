@@ -66,6 +66,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Product>()
   const [packagingProduct, setPackagingProduct] = useState<Product>()
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [lifecycleProductId, setLifecycleProductId] = useState<string>()
@@ -85,6 +86,15 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
         .map((category) => ({ value: category })),
     [products],
   )
+  const editorCategoryOptions = useMemo(() => {
+    const currentCategory = editing?.category.trim()
+    if (!currentCategory) return categoryOptions
+
+    return [
+      { value: currentCategory },
+      ...categoryOptions.filter((option) => option.value.toLowerCase() !== currentCategory.toLowerCase()),
+    ]
+  }, [categoryOptions, editing?.category])
 
   function currentImages(): string[] {
     return ((form.getFieldValue('imageUrls') as string[] | undefined) ?? []).slice(0, MAX_IMAGES)
@@ -155,6 +165,7 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
 
   function openEditor(product: Product) {
     setEditing(product)
+    setCategoryMenuOpen(false)
     form.setFieldsValue({
       name: product.name,
       category: product.category,
@@ -391,7 +402,12 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
             ]}
           >
             <AutoComplete
-              options={categoryOptions}
+              open={categoryMenuOpen}
+              options={editorCategoryOptions}
+              defaultActiveFirstOption
+              onFocus={() => setCategoryMenuOpen(true)}
+              onBlur={() => setCategoryMenuOpen(false)}
+              onSelect={() => setCategoryMenuOpen(false)}
               filterOption={(input, option) =>
                 String(option?.value ?? '')
                   .toLowerCase()
