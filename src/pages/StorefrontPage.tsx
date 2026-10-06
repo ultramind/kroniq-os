@@ -12,7 +12,7 @@ import {
   StarFilled,
   WhatsAppOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Tag } from 'antd'
+import { Button, Empty, Input, Pagination, Tag } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { formatNaira } from '../lib/currency'
@@ -31,6 +31,8 @@ type Storefront = {
   address?: string
   primary_color?: string
   hero_image_urls?: string[]
+  hero_image_captions?: string[]
+  hero_background_url?: string
   logo_url?: string
   vision?: string
   mission?: string
@@ -83,12 +85,15 @@ export function StorefrontPage() {
     hostname !== 'kroniqos.com' &&
     hostname !== 'www.kroniqos.com' &&
     !hostname.endsWith('.vercel.app')
-  const [, routeSlug = '', routeSection, routeProductId] = pathSegments
+  const [, routeSlug = '', routeSection, routeResourceId] = pathSegments
   const [customDomainSlug, setCustomDomainSlug] = useState<string>()
   const [customDomainResolved, setCustomDomainResolved] = useState(!customDomainHost)
   const slug = customDomainHost ? (customDomainSlug ?? '') : routeSlug
   const section = customDomainHost ? pathSegments[0] : routeSection
-  const productId = customDomainHost ? pathSegments[1] : routeProductId
+  const resourceId = customDomainHost ? pathSegments[1] : routeResourceId
+  const productId = section === 'products' ? resourceId : undefined
+  const categoryName =
+    section === 'categories' && resourceId ? decodeURIComponent(resourceId).trim() : undefined
   const [store, setStore] = useState<Storefront>()
   const [products, setProducts] = useState<Product[]>([])
   const [sections, setSections] = useState<Section[]>([])
@@ -256,6 +261,9 @@ export function StorefrontPage() {
             <Link className="text-slate-600 transition hover:text-[#0B1121]" to={baseUrl || '/'}>
               Shop
             </Link>
+            <Link className="text-slate-600 transition hover:text-[#0B1121]" to={`${baseUrl}/categories`}>
+              Categories
+            </Link>
             <Link className="text-slate-600 transition hover:text-[#0B1121]" to={`${baseUrl}/about`}>
               About
             </Link>
@@ -299,6 +307,13 @@ export function StorefrontPage() {
               </Link>
               <Link
                 className="px-3 py-3 text-sm font-medium text-slate-700"
+                to={`${baseUrl}/categories`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Categories
+              </Link>
+              <Link
+                className="px-3 py-3 text-sm font-medium text-slate-700"
                 to={`${baseUrl}/about`}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -333,6 +348,14 @@ export function StorefrontPage() {
         <ContactPage store={store} baseUrl={baseUrl} primaryColor={primaryColor} actions={contactActions} />
       ) : section === 'products' ? (
         <ProductPage product={selectedProduct} store={store} baseUrl={baseUrl} actions={contactActions} />
+      ) : section === 'categories' ? (
+        <CategoryPage
+          store={store}
+          products={products}
+          baseUrl={baseUrl}
+          primaryColor={primaryColor}
+          categoryName={categoryName}
+        />
       ) : (
         <HomePage
           store={store}
@@ -391,6 +414,14 @@ function HomePage({
     .sort((a, b) => +new Date(b.published_at ?? 0) - +new Date(a.published_at ?? 0))
     .slice(0, 8)
   const categories = [...new Set(products.map((product) => product.category || 'Products'))]
+  const banners = sections.filter((section) => section.section_type === 'banner').slice(0, 2)
+  const collectionSections = sections.filter((section) => section.section_type === 'collection')
+  const contentSections = sections.filter(
+    (section) =>
+      section.section_type !== 'banner' &&
+      section.section_type !== 'collection' &&
+      section.section_type !== 'testimonials',
+  )
   return (
     <>
       <StorefrontHero
@@ -404,8 +435,14 @@ function HomePage({
         <section className="border-b border-slate-200 bg-slate-50">
           <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-slate-200 px-5 sm:grid-cols-4">
             {store.trust_stats.map((stat, index) => (
-              <div key={`${stat.label}-${index}`} className="px-4 py-7 text-center">
-                <p className="text-2xl font-semibold">{stat.value}</p>
+              <div
+                key={`${stat.label}-${index}`}
+                style={{ borderTopColor: primaryColor }}
+                className="border-t-2 px-4 py-7 text-center first:border-t-0 sm:first:border-t-2"
+              >
+                <p style={{ color: primaryColor }} className="text-2xl font-semibold">
+                  {stat.value}
+                </p>
                 <p className="mt-1 text-sm text-slate-500">{stat.label}</p>
               </div>
             ))}
@@ -435,16 +472,41 @@ function HomePage({
               <>
                 <div className="mb-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                   {categories.map((category) => (
-                    <button
+                    <Link
                       key={category}
-                      onClick={() => setQuery(category)}
+                      to={`${baseUrl}/categories/${encodeURIComponent(category)}`}
                       className="border border-slate-200 px-4 py-4 text-left text-sm font-medium transition hover:border-slate-500"
                     >
                       {category}
-                    </button>
+                    </Link>
                   ))}
                 </div>
-                {featured.length > 0 && (
+                {banners.length > 0 && (
+                  <div className="mb-16 grid gap-5 md:grid-cols-2">
+                    {banners.map((banner) => (
+                      <CustomSection
+                        key={banner.id}
+                        section={banner}
+                        products={featured}
+                        testimonials={testimonials}
+                        baseUrl={baseUrl}
+                        primaryColor={primaryColor}
+                        compact
+                      />
+                    ))}
+                  </div>
+                )}
+                {collectionSections.map((item) => (
+                  <CustomSection
+                    key={item.id}
+                    section={item}
+                    products={featured}
+                    testimonials={testimonials}
+                    baseUrl={baseUrl}
+                    primaryColor={primaryColor}
+                  />
+                ))}
+                {featured.length > 0 && collectionSections.length === 0 && (
                   <StorefrontCollection
                     eyebrow="Popular picks"
                     title="Featured products"
@@ -460,7 +522,7 @@ function HomePage({
                     baseUrl={baseUrl}
                   />
                 )}
-                {sections.map((item) => (
+                {contentSections.map((item) => (
                   <CustomSection
                     key={item.id}
                     section={item}
@@ -476,6 +538,7 @@ function HomePage({
                   products={products}
                   baseUrl={baseUrl}
                 />
+                {testimonials.length > 0 && <TestimonialsSection testimonials={testimonials} />}
               </>
             )}
           </>
@@ -534,7 +597,12 @@ function StorefrontHero({
     return (
       <section className="relative isolate min-h-[520px] overflow-hidden bg-[#0B1121] text-white">
         {image && (
-          <img src={image} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-45" />
+          <HeroImageCarousel
+            images={store.hero_image_urls ?? []}
+            captions={store.hero_image_captions ?? []}
+            storeName={store.store_name}
+            className="absolute inset-0 -z-20 min-h-0"
+          />
         )}
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#0B1121]/45 via-[#0B1121]/65 to-[#0B1121]" />
         <div className="mx-auto flex min-h-[520px] max-w-5xl flex-col items-center justify-center px-5 py-20 text-center">
@@ -551,8 +619,19 @@ function StorefrontHero({
       </section>
     )
   return (
-    <section style={{ backgroundColor: primaryColor }} className="overflow-hidden text-white">
-      <div className="mx-auto grid min-h-[480px] max-w-7xl lg:grid-cols-2">
+    <section
+      style={{ backgroundColor: primaryColor }}
+      className="relative isolate overflow-hidden text-white"
+    >
+      {store.hero_background_url && (
+        <img
+          src={store.hero_background_url}
+          alt=""
+          className="absolute inset-0 -z-20 h-full w-full object-cover"
+        />
+      )}
+      {store.hero_background_url && <div className="absolute inset-0 -z-10 bg-black/45" />}
+      <div className="relative mx-auto grid min-h-[480px] max-w-7xl lg:grid-cols-2">
         <div className="flex flex-col justify-center px-5 py-16 sm:px-10 lg:px-14">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
             Welcome to {store.store_name}
@@ -561,13 +640,27 @@ function StorefrontHero({
           <p className="mt-5 max-w-xl text-base leading-7 text-slate-200">{description}</p>
           <div className="mt-8">{actions}</div>
         </div>
-        <HeroImageCarousel images={store.hero_image_urls ?? []} storeName={store.store_name} />
+        <HeroImageCarousel
+          images={store.hero_image_urls ?? []}
+          captions={store.hero_image_captions ?? []}
+          storeName={store.store_name}
+        />
       </div>
     </section>
   )
 }
 
-function HeroImageCarousel({ images, storeName }: { images: string[]; storeName: string }) {
+function HeroImageCarousel({
+  images,
+  captions,
+  storeName,
+  className = '',
+}: {
+  images: string[]
+  captions: string[]
+  storeName: string
+  className?: string
+}) {
   const [activeImage, setActiveImage] = useState(0)
   const visibleImages = images.slice(0, 2)
   useEffect(() => {
@@ -579,7 +672,7 @@ function HeroImageCarousel({ images, storeName }: { images: string[]; storeName:
     return () => window.clearInterval(timer)
   }, [visibleImages.length])
   return (
-    <div className="hero-image-carousel relative min-h-[330px] overflow-hidden bg-slate-900 lg:min-h-full">
+    <div className={`hero-image-carousel relative min-h-[330px] overflow-hidden lg:min-h-full ${className}`}>
       {visibleImages.length ? (
         visibleImages.map((image, index) => (
           <img
@@ -590,12 +683,10 @@ function HeroImageCarousel({ images, storeName }: { images: string[]; storeName:
           />
         ))
       ) : (
-        <div className="grid h-full place-items-center bg-black/15 text-sm text-white/70">
-          Storefront image
-        </div>
+        <div className="grid h-full place-items-center text-sm text-white/70">Storefront image</div>
       )}
       {visibleImages.length > 1 && (
-        <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-2">
+        <div className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
           {visibleImages.map((image, index) => (
             <button
               key={image}
@@ -605,6 +696,11 @@ function HeroImageCarousel({ images, storeName }: { images: string[]; storeName:
               className={`h-1.5 w-7 transition ${index === activeImage ? 'bg-white' : 'bg-white/45'}`}
             />
           ))}
+        </div>
+      )}
+      {captions[activeImage]?.trim() && (
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-6 pb-10 pt-16 text-white">
+          <p className="m-0 max-w-md text-sm font-medium leading-6">{captions[activeImage]}</p>
         </div>
       )}
     </div>
@@ -631,13 +727,57 @@ function StorefrontCollection({
   )
 }
 
+function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) {
+  return (
+    <section className="mb-16 border-y border-slate-200 py-14">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Customer stories</p>
+      <h2 className="mb-8 mt-2 text-3xl font-semibold">What our customers say</h2>
+      <div className="grid gap-4 md:grid-cols-3">
+        {testimonials.slice(0, 6).map((item) => (
+          <article key={item.id} className="border border-slate-200 p-5">
+            <div className="mb-4 flex gap-1 text-amber-500">
+              {Array.from({ length: item.rating }).map((_, index) => (
+                <StarFilled key={index} />
+              ))}
+            </div>
+            <p className="leading-7 text-slate-600">“{item.quote}”</p>
+            <p className="mt-5 font-semibold">
+              {item.customer_name}{' '}
+              {item.verified && <span className="text-xs font-medium text-emerald-700">· Verified customer</span>}
+            </p>
+            {item.customer_title && <p className="text-sm text-slate-500">{item.customer_title}</p>}
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function ProductGrid({ products, baseUrl, empty }: { products: Product[]; baseUrl: string; empty: string }) {
+  const pageSize = 12
+  const [page, setPage] = useState(1)
+  useEffect(() => setPage(1), [products])
+  const totalPages = Math.ceil(products.length / pageSize)
+  const visibleProducts = products.slice((page - 1) * pageSize, page * pageSize)
   return products.length ? (
-    <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} href={`${baseUrl}/products/${product.id}`} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+        {visibleProducts.map((product) => (
+          <ProductCard key={product.id} product={product} href={`${baseUrl}/products/${product.id}`} />
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center">
+          <Pagination
+            current={page}
+            pageSize={pageSize}
+            total={products.length}
+            showSizeChanger={false}
+            onChange={setPage}
+          />
+        </div>
+      )}
+    </>
   ) : (
     <Empty description={empty} />
   )
@@ -649,43 +789,61 @@ function CustomSection({
   testimonials,
   baseUrl,
   primaryColor,
+  compact = false,
 }: {
   section: Section
   products: Product[]
   testimonials: Testimonial[]
   baseUrl: string
   primaryColor: string
+  compact?: boolean
 }) {
   if (section.section_type === 'collection')
     return (
       <StorefrontCollection eyebrow="Curated" title={section.title} products={products} baseUrl={baseUrl} />
     )
-  if (section.section_type === 'testimonials')
-    return testimonials.length ? (
-      <section className="mb-16 border-y border-slate-200 py-14">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Customer stories</p>
-        <h2 className="mb-8 mt-2 text-3xl font-semibold">{section.title}</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {testimonials.slice(0, 6).map((item) => (
-            <article key={item.id} className="border border-slate-200 p-5">
-              <div className="mb-4 flex gap-1 text-amber-500">
-                {Array.from({ length: item.rating }).map((_, index) => (
-                  <StarFilled key={index} />
-                ))}
-              </div>
-              <p className="leading-7 text-slate-600">“{item.quote}”</p>
-              <p className="mt-5 font-semibold">
-                {item.customer_name}{' '}
-                {item.verified && (
-                  <span className="text-xs font-medium text-emerald-700">· Verified customer</span>
-                )}
-              </p>
-              {item.customer_title && <p className="text-sm text-slate-500">{item.customer_title}</p>}
-            </article>
-          ))}
-        </div>
+  if (section.section_type === 'testimonials') return null
+  if (section.section_type === 'banner') {
+    const hasCta = Boolean(section.cta_label && section.cta_url)
+    const content = (
+      <div className={`relative overflow-hidden bg-slate-100 ${compact ? 'min-h-56' : 'min-h-48 sm:min-h-64'}`}>
+        {section.image_url ? (
+          <img
+            src={section.image_url}
+            alt={section.title}
+            className="absolute inset-0 h-full w-full object-cover transition duration-500 hover:scale-[1.02]"
+          />
+        ) : null}
+        {(section.title || section.body || hasCta) && (
+          <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-black/45 to-black/15 p-6 text-white sm:p-8">
+            <div>
+              <h2 className="m-0 text-2xl font-semibold sm:text-3xl">{section.title}</h2>
+              {section.body && (
+                <p className="mb-0 mt-2 max-w-xl text-sm leading-6 text-white/90">{section.body}</p>
+              )}
+              {hasCta && (
+                <a
+                  href={section.cta_url ?? '#'}
+                  className="mt-4 inline-flex bg-white px-4 py-2 text-sm font-semibold text-[#0B1121] transition hover:bg-slate-100"
+                >
+                  {section.cta_label}
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+    return section.cta_url && !hasCta ? (
+      <section className={`${compact ? '' : 'mb-10'} overflow-hidden border border-slate-200`}>
+        <a href={section.cta_url} className="block" aria-label={section.title}>
+          {content}
+        </a>
       </section>
-    ) : null
+    ) : (
+      <section className={`${compact ? '' : 'mb-10'} overflow-hidden border border-slate-200`}>{content}</section>
+    )
+  }
   return (
     <section className="mb-16 overflow-hidden border border-slate-200">
       <div className="grid md:grid-cols-2">
@@ -709,6 +867,104 @@ function CustomSection({
         </div>
       </div>
     </section>
+  )
+}
+
+function CategoryPage({
+  store,
+  products,
+  baseUrl,
+  primaryColor,
+  categoryName,
+}: {
+  store: Storefront
+  products: Product[]
+  baseUrl: string
+  primaryColor: string
+  categoryName?: string
+}) {
+  const categories = [...new Set(products.map((product) => product.category || 'Products'))].sort((a, b) =>
+    a.localeCompare(b),
+  )
+  const matchingCategory = categoryName
+    ? categories.find((category) => category.toLowerCase() === categoryName.toLowerCase())
+    : undefined
+  const categoryProducts = matchingCategory
+    ? products.filter((product) => (product.category || 'Products').toLowerCase() === matchingCategory.toLowerCase())
+    : []
+
+  if (categoryName && !matchingCategory)
+    return (
+      <section className="grid flex-1 place-items-center px-5 py-20">
+        <Empty description="This category is unavailable.">
+          <Link to={`${baseUrl}/categories`}>
+            <Button>Browse categories</Button>
+          </Link>
+        </Empty>
+      </section>
+    )
+
+  if (matchingCategory)
+    return (
+      <>
+        <StorefrontPageHero
+          store={store}
+          baseUrl={baseUrl}
+          title={matchingCategory}
+          primaryColor={primaryColor}
+        />
+        <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:py-16">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Category</p>
+              <h2 className="mt-2 text-3xl font-semibold">{matchingCategory}</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                {categoryProducts.length} {categoryProducts.length === 1 ? 'product' : 'products'} available
+              </p>
+            </div>
+            <Link to={`${baseUrl}/categories`} className="text-sm font-medium text-slate-600 hover:text-[#0B1121]">
+              <ArrowLeftOutlined /> All categories
+            </Link>
+          </div>
+          <ProductGrid products={categoryProducts} baseUrl={baseUrl} empty="No products are available in this category." />
+        </section>
+      </>
+    )
+
+  return (
+    <>
+      <StorefrontPageHero store={store} baseUrl={baseUrl} title="Shop by category" primaryColor={primaryColor} />
+      <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:py-16">
+        <div className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Browse the catalogue</p>
+          <h2 className="mt-2 text-3xl font-semibold">Choose a category</h2>
+        </div>
+        {categories.length ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {categories.map((category) => {
+              const count = products.filter((product) => (product.category || 'Products') === category).length
+              return (
+                <Link
+                  key={category}
+                  to={`${baseUrl}/categories/${encodeURIComponent(category)}`}
+                  className="group border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm"
+                >
+                  <p className="m-0 text-base font-semibold text-[#0B1121]">{category}</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {count} {count === 1 ? 'product' : 'products'}
+                  </p>
+                  <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 group-hover:text-[#0B1121]">
+                    Shop category <RightOutlined className="text-xs" />
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        ) : (
+          <Empty description="No product categories have been published yet." />
+        )}
+      </section>
+    </>
   )
 }
 

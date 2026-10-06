@@ -21,6 +21,13 @@ export type ProductDetails = Pick<
 
 export type ProductLifecycleAction = 'archive' | 'restore' | 'delete'
 
+export async function publishAllActiveProducts() {
+  if (!supabase || !navigator.onLine) throw new Error('Publishing products requires an internet connection.')
+  const { data, error } = await supabase.rpc('publish_all_current_store_products')
+  if (error) throw error
+  return Number(data ?? 0)
+}
+
 export async function manageProductLifecycle(product: Product, action: ProductLifecycleAction) {
   if (!supabase || !navigator.onLine)
     throw new Error('Product lifecycle changes require an internet connection.')

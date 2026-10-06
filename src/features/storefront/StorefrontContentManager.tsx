@@ -97,6 +97,13 @@ export function StorefrontContentManager() {
   }, [load])
   const saveSection = async (values: SectionValues) => {
     if (!supabase || !storeId) return
+    const existingBanners = sections.filter(
+      (section) => section.section_type === 'banner' && section.id !== editingSection?.id,
+    ).length
+    if (values.section_type === 'banner' && existingBanners >= 2) {
+      api.warning('You can add a maximum of two homepage banners.')
+      return
+    }
     setSaving(true)
     try {
       const payload = { ...values, store_id: storeId, position: Number(values.position ?? 0) }
@@ -169,33 +176,31 @@ export function StorefrontContentManager() {
       setUploading(false)
     }
   }
+  const bannerCount = sections.filter((section) => section.section_type === 'banner').length
+  const openNewSection = (sectionType: Section['section_type'] = 'text') => {
+    setEditingSection(undefined)
+    sectionForm.resetFields()
+    sectionForm.setFieldsValue({
+      section_type: sectionType,
+      visible: true,
+      position: sections.length + 1,
+    })
+    setSectionOpen(true)
+  }
   return (
     <div className="mt-6 space-y-6">
       {holder}
       <Card
         title="Homepage sections"
         extra={
-          <Button
-            icon={<PlusOutlined />}
-            disabled={sections.length >= 8}
-            onClick={() => {
-              setEditingSection(undefined)
-              sectionForm.resetFields()
-              sectionForm.setFieldsValue({
-                section_type: 'text',
-                visible: true,
-                position: sections.length + 1,
-              })
-              setSectionOpen(true)
-            }}
-          >
+          <Button icon={<PlusOutlined />} disabled={sections.length >= 8} onClick={() => openNewSection()}>
             Add section
           </Button>
         }
       >
         <p className="mb-4 text-sm text-slate-500">
-          Add up to eight sections. Use Featured products and Testimonials to show approved content
-          automatically.
+          Add up to eight sections, including two promotional banners. Upload an image for any section where
+          you want a visual.
         </p>
         {sections.length ? (
           <List
@@ -323,7 +328,15 @@ export function StorefrontContentManager() {
       >
         <Form form={sectionForm} layout="vertical" onFinish={(values) => void saveSection(values)}>
           <Form.Item name="section_type" label="Section type" rules={[{ required: true }]}>
-            <Select options={Object.entries(labels).map(([value, label]) => ({ value, label }))} />
+          <Select
+              options={Object.entries(labels)
+                .filter(([value]) => value !== 'testimonials')
+                .map(([value, label]) => ({
+                value,
+                label,
+                disabled: value === 'banner' && bannerCount >= 2 && editingSection?.section_type !== 'banner',
+                }))}
+            />
           </Form.Item>
           <Form.Item name="title" label="Title" rules={[{ required: true }]}>
             <Input />
@@ -331,15 +344,85 @@ export function StorefrontContentManager() {
           <Form.Item name="body" label="Content">
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="image_url" label="Image URL">
-            <Input placeholder="Optional image URL" />
+          <Form.Item name="image_url" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item shouldUpdate noStyle>
+            {() => {
+              const isBanner = sectionForm.getFieldValue('section_type') === 'banner'
+              const imageUrl = sectionForm.getFieldValue('image_url') as string | undefined
+              return (
+                <div className="mb-5 border border-slate-200 p-3">
+                  <div className="mb-2 text-sm font-medium">{isBanner ? 'Banner image' : 'Section image'}</div>
+                  {imageUrl && <img src={imageUrl} alt="Section preview" className="mb-3 h-28 w-full object-cover" />}
+                  <div className="flex flex-wrap gap-2">
+                    <Upload
+                      accept="image/jpeg,image/png,image/webp"
+                      showUploadList={false}
+                      customRequest={({ file, onSuccess, onError }) => {
+                        void uploadVisual(file as File, 'sections', (url) => sectionForm.setFieldValue('image_url', url))
+                          .then(() => onSuccess?.({}))
+                          .catch((error: Error) => {
+                            api.error(error.message || 'Could not upload section image.')
+                            onError?.(error)
+                          })
+                      }}
+                    >
+                      <Button icon={<UploadOutlined />} loading={uploading}>
+                        {imageUrl ? 'Replace image' : 'Upload image'}
+                      </Button>
+                    </Upload>
+                    {imageUrl && (
+                      <Button danger icon={<DeleteOutlined />} onClick={() => sectionForm.setFieldValue('image_url', undefined)}>
+                        Remove image
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mb-0 mt-2 text-xs text-slate-500">
+                    {isBanner ? 'Use a wide landscape image. ' : ''}JPG, PNG, or WebP up to 5 MB.
+                  </p>
+                </div>
+              )
+            }}
           </Form.Item>
           <div className="grid grid-cols-2 gap-3">
-            <Form.Item name="cta_label" label="Button label">
-              <Input />
+            <Form.Item shouldUpdate noStyle>
+              {() => (
+                <Form.Item
+                  name="cta_label"
+                  label={
+                    sectionForm.getFieldValue('section_type') === 'banner'
+                      ? 'Banner CTA button label'
+                      : 'Button label'
+                  }
+                >
+                  <Input
+                    placeholder={
+                      sectionForm.getFieldValue('section_type') === 'banner' ? 'Shop offer' : undefined
+                    }
+                  />
+                </Form.Item>
+              )}
             </Form.Item>
-            <Form.Item name="cta_url" label="Button link">
-              <Input />
+            <Form.Item shouldUpdate noStyle>
+              {() => (
+                <Form.Item
+                  name="cta_url"
+                  label={
+                    sectionForm.getFieldValue('section_type') === 'banner'
+                      ? 'Banner destination URL'
+                      : 'Button link'
+                  }
+                >
+                  <Input
+                    placeholder={
+                      sectionForm.getFieldValue('section_type') === 'banner'
+                        ? 'https://… or /products'
+                        : undefined
+                    }
+                  />
+                </Form.Item>
+              )}
             </Form.Item>
           </div>
           <div className="grid grid-cols-2 gap-3">

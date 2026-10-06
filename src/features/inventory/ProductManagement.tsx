@@ -20,6 +20,7 @@ import {
 } from 'antd'
 import {
   BarcodeOutlined,
+  CloudUploadOutlined,
   DeleteOutlined,
   EditOutlined,
   InboxOutlined,
@@ -59,10 +60,11 @@ type Props = {
   products: Product[]
   role: Role
   onSave: (product: Product, values: Values) => Promise<void>
+  onPublishAll: () => Promise<number>
   onLifecycleChange: (product: Product, action: 'archive' | 'restore' | 'delete') => Promise<void>
 }
 
-export function ProductManagement({ products, role, onSave, onLifecycleChange }: Props) {
+export function ProductManagement({ products, role, onSave, onPublishAll, onLifecycleChange }: Props) {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Product>()
   const [packagingProduct, setPackagingProduct] = useState<Product>()
@@ -70,6 +72,8 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [lifecycleProductId, setLifecycleProductId] = useState<string>()
+  const [publishAllOpen, setPublishAllOpen] = useState(false)
+  const [publishingAll, setPublishingAll] = useState(false)
   const [form] = Form.useForm<Values>()
   const [api, holder] = message.useMessage()
   const rows = useMemo(
@@ -95,6 +99,10 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
       ...categoryOptions.filter((option) => option.value.toLowerCase() !== currentCategory.toLowerCase()),
     ]
   }, [categoryOptions, editing?.category])
+  const unpublishedActiveCount = useMemo(
+    () => products.filter((product) => product.active !== false && !product.onlinePublished).length,
+    [products],
+  )
 
   function currentImages(): string[] {
     return ((form.getFieldValue('imageUrls') as string[] | undefined) ?? []).slice(0, MAX_IMAGES)
@@ -127,6 +135,23 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
       api.error(error instanceof Error ? error.message : 'Could not update the product.')
     } finally {
       setLifecycleProductId(undefined)
+    }
+  }
+
+  async function publishAll() {
+    setPublishingAll(true)
+    try {
+      const publishedCount = await onPublishAll()
+      api.success(
+        publishedCount
+          ? `${publishedCount} active product${publishedCount === 1 ? '' : 's'} published online.`
+          : 'All active products are already published.',
+      )
+      setPublishAllOpen(false)
+    } catch (error) {
+      api.error(error instanceof Error ? error.message : 'Could not publish products.')
+    } finally {
+      setPublishingAll(false)
     }
   }
 
@@ -357,7 +382,21 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
   return (
     <>
       {holder}
-      <Card title="Product catalogue">
+      <Card
+        title="Product catalogue"
+        extra={
+          role !== 'cashier' && (
+            <Button
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              disabled={!unpublishedActiveCount}
+              onClick={() => setPublishAllOpen(true)}
+            >
+              Publish all
+            </Button>
+          )
+        }
+      >
         <Input.Search
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -565,6 +604,19 @@ export function ProductManagement({ products, role, onSave, onLifecycleChange }:
             <Switch checkedChildren="Featured" unCheckedChildren="Regular" />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        title="Publish all active products?"
+        open={publishAllOpen}
+        okText={`Publish ${unpublishedActiveCount} product${unpublishedActiveCount === 1 ? '' : 's'}`}
+        onCancel={() => setPublishAllOpen(false)}
+        onOk={() => void publishAll()}
+        confirmLoading={publishingAll}
+      >
+        <p className="mb-0 text-sm text-slate-600">
+          This publishes all {unpublishedActiveCount} active draft product
+          {unpublishedActiveCount === 1 ? '' : 's'} to your online storefront. Archived products stay hidden.
+        </p>
       </Modal>
       <ProductPackagingModal
         product={packagingProduct}

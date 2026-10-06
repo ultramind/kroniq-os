@@ -13,7 +13,11 @@ import { StockAdjustmentModal } from '../features/inventory/StockAdjustmentModal
 import { StockCountModal } from '../features/inventory/StockCountModal'
 import { recordStockAdjustment, recordStockDeliveryBatch } from '../features/inventory/inventory.service'
 import { DeliveryModal } from '../features/inventory/DeliveryModal'
-import { manageProductLifecycle, updateProductDetails } from '../features/inventory/product.service'
+import {
+  manageProductLifecycle,
+  publishAllActiveProducts,
+  updateProductDetails,
+} from '../features/inventory/product.service'
 import { saveOfflineSale, type CreditDetails } from '../features/pos/checkout.service'
 import { ReceiptModal } from '../features/sales/ReceiptModal'
 import { returnSaleItems } from '../features/sales/returns.service'
@@ -596,6 +600,11 @@ export function App({
     await manageProductLifecycle(product, action)
     await pullProducts()
   }
+  async function publishAllProducts() {
+    const publishedCount = await publishAllActiveProducts()
+    await pullProducts()
+    return publishedCount
+  }
   async function reloadCatalogue() {
     const result = await pullProducts()
     if (result.error) {
@@ -724,6 +733,7 @@ export function App({
                     setInventoryOpen(true)
                   }}
                   onSaveProduct={saveProductDetails}
+                  onPublishAllProducts={publishAllProducts}
                   onProductLifecycle={changeProductLifecycle}
                 />
               }

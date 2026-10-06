@@ -9,6 +9,7 @@ export function ProductsPage({
   role,
   onAddProduct,
   onSaveProduct,
+  onPublishAllProducts,
   onProductLifecycle,
 }: {
   products: Product[]
@@ -33,6 +34,7 @@ export function ProductsPage({
     },
   ) => Promise<void>
   onProductLifecycle: (product: Product, action: 'archive' | 'restore' | 'delete') => Promise<void>
+  onPublishAllProducts: () => Promise<number>
 }) {
   const active = products.filter((product) => product.active !== false)
   const lowStock = active.filter((product) => product.stock <= (product.lowStockThreshold ?? 10)).length
@@ -84,6 +86,7 @@ export function ProductsPage({
         products={products}
         role={role}
         onSave={onSaveProduct}
+        onPublishAll={onPublishAllProducts}
         onLifecycleChange={onProductLifecycle}
       />
     </div>

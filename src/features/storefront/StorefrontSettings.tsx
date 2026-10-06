@@ -15,6 +15,8 @@ type Values = {
   address?: string
   primaryColor?: string
   heroImageUrls?: string[]
+  heroImageCaptions?: string[]
+  heroBackgroundUrl?: string
   logoUrl?: string
   vision?: string
   mission?: string
@@ -45,6 +47,7 @@ export function StorefrontSettings() {
   const [form] = Form.useForm<Values>()
   const [api, holder] = message.useMessage()
   const [uploading, setUploading] = useState(false)
+  const [uploadingHeroBackground, setUploadingHeroBackground] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [saving, setSaving] = useState(false)
   const [storeId, setStoreId] = useState<string>()
@@ -71,7 +74,7 @@ export function StorefrontSettings() {
         supabase
           .from('storefronts')
           .select(
-            'slug,enabled,template_key,headline,description,phone,whatsapp,address,primary_color,hero_image_urls,logo_url,vision,mission,trust_stats',
+            'slug,enabled,template_key,headline,description,phone,whatsapp,address,primary_color,hero_image_urls,hero_image_captions,hero_background_url,logo_url,vision,mission,trust_stats',
           )
           .eq('store_id', profile.store_id)
           .maybeSingle(),
@@ -100,6 +103,8 @@ export function StorefrontSettings() {
           templateKey: storefrontResult.data.template_key,
           primaryColor: storefrontResult.data.primary_color,
           heroImageUrls: storefrontResult.data.hero_image_urls ?? [],
+          heroImageCaptions: storefrontResult.data.hero_image_captions ?? [],
+          heroBackgroundUrl: storefrontResult.data.hero_background_url ?? undefined,
           logoUrl: storefrontResult.data.logo_url ?? undefined,
           trustStats: Array.isArray(storefrontResult.data.trust_stats)
             ? storefrontResult.data.trust_stats
@@ -110,6 +115,10 @@ export function StorefrontSettings() {
 
   function heroImages(): string[] {
     return ((form.getFieldValue('heroImageUrls') as string[] | undefined) ?? []).slice(0, MAX_HERO_IMAGES)
+  }
+
+  function heroCaptions(): string[] {
+    return ((form.getFieldValue('heroImageCaptions') as string[] | undefined) ?? []).slice(0, MAX_HERO_IMAGES)
   }
 
   async function uploadHeroImage(file: File) {
@@ -136,6 +145,7 @@ export function StorefrontSettings() {
       if (error) throw error
       const { data: url } = supabase.storage.from('storefront-images').getPublicUrl(path)
       form.setFieldValue('heroImageUrls', [...heroImages(), url.publicUrl])
+      form.setFieldValue('heroImageCaptions', [...heroCaptions(), ''])
       api.success('Hero image uploaded. Save storefront changes to publish it.')
     } finally {
       setUploading(false)
@@ -165,6 +175,28 @@ export function StorefrontSettings() {
     }
   }
 
+  async function uploadHeroBackground(file: File) {
+    if (!supabase) throw new Error('Image storage is not configured.')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
+      throw new Error('Use a JPG, PNG, or WebP image.')
+    if (file.size > 5 * 1024 * 1024) throw new Error('Hero background must be 5 MB or smaller.')
+    if (!storeId) throw new Error('Store profile not found.')
+    setUploadingHeroBackground(true)
+    try {
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const path = `${storeId}/background/${crypto.randomUUID()}.${extension}`
+      const { error } = await supabase.storage
+        .from('storefront-images')
+        .upload(path, file, { contentType: file.type, upsert: false })
+      if (error) throw error
+      const { data: url } = supabase.storage.from('storefront-images').getPublicUrl(path)
+      form.setFieldValue('heroBackgroundUrl', url.publicUrl)
+      api.success('Hero background uploaded. Save storefront changes to publish it.')
+    } finally {
+      setUploadingHeroBackground(false)
+    }
+  }
+
   async function save(values: Values) {
     if (!supabase) return
     setSaving(true)
@@ -181,6 +213,8 @@ export function StorefrontSettings() {
           address: values.address,
           primary_color: values.primaryColor || '#0B1121',
           hero_image_urls: (values.heroImageUrls ?? []).slice(0, MAX_HERO_IMAGES),
+          hero_image_captions: (values.heroImageCaptions ?? []).slice(0, MAX_HERO_IMAGES),
+          hero_background_url: values.heroBackgroundUrl || null,
           logo_url: values.logoUrl || null,
           vision: values.vision || null,
           mission: values.mission || null,
@@ -215,7 +249,7 @@ export function StorefrontSettings() {
   }
 
   return (
-    <Card title="Online storefront" className="w-full xl:w-1/2">
+    <Card title="Online storefront" className="w-full">
       {holder}
       <p className="text-sm text-slate-500">
         Create a branded public catalogue. Only products marked as published online will appear.
@@ -228,6 +262,7 @@ export function StorefrontSettings() {
           templateKey: 'classic_retail',
           primaryColor: '#0B1121',
           heroImageUrls: [],
+          heroImageCaptions: [],
         }}
         onFinish={(values) => void save(values)}
         className="mt-5"
@@ -428,8 +463,9 @@ export function StorefrontSettings() {
             description="Starter tenants can prepare content, but need Growth or higher to publish the public shop, use a custom logo, and accept customer visits."
           />
         )}
-        {canUseLogo && (
-          <div className="mb-6">
+        <div className="mb-6 grid gap-5 lg:grid-cols-2">
+          {canUseLogo && (
+            <div className="border border-slate-200 p-4">
             <label className="mb-2 block font-medium">Storefront logo</label>
             <div className="flex items-center gap-3">
               <Form.Item name="logoUrl" noStyle>
@@ -475,24 +511,87 @@ export function StorefrontSettings() {
             <p className="mt-2 text-xs text-slate-500">
               Growth plan or higher · JPG, PNG, or WebP · 2 MB maximum.
             </p>
+            </div>
+          )}
+          <div className="border border-slate-200 p-4">
+            <Form.Item
+              className="!mb-0"
+              name="primaryColor"
+              label="Primary brand colour"
+              extra="Used for your public storefront header, statistics, and call-to-action buttons."
+              rules={[{ pattern: /^#[0-9A-Fa-f]{6}$/, message: 'Choose a valid six-digit colour.' }]}
+            >
+              <Input type="color" className="!h-10 !w-20 !p-1" />
+            </Form.Item>
           </div>
-        )}
-        <Form.Item
-          name="primaryColor"
-          label="Primary brand colour"
-          extra="Used for your public storefront header and call-to-action buttons."
-          rules={[{ pattern: /^#[0-9A-Fa-f]{6}$/, message: 'Choose a valid six-digit colour.' }]}
-        >
-          <Input type="color" className="!h-10 !w-20 !p-1" />
+        </div>
+        <div className="mb-6 grid gap-5 lg:grid-cols-2">
+        <Form.Item shouldUpdate noStyle>
+          {() => {
+            const heroBackgroundUrl = form.getFieldValue('heroBackgroundUrl') as string | undefined
+            return (
+              <div className="border border-slate-200 p-4">
+                <label className="mb-2 block font-medium">Hero background</label>
+                <Form.Item name="heroBackgroundUrl" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
+                <div className="flex flex-wrap items-center gap-3">
+                  {heroBackgroundUrl && (
+                    <Image
+                      src={heroBackgroundUrl}
+                      alt="Hero background"
+                      width={144}
+                      height={80}
+                      className="border border-slate-200 object-cover"
+                      preview
+                    />
+                  )}
+                  {heroBackgroundUrl && (
+                    <Button
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={() => form.setFieldValue('heroBackgroundUrl', undefined)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                  <Upload
+                    accept="image/jpeg,image/png,image/webp"
+                    showUploadList={false}
+                    customRequest={({ file, onSuccess, onError }) => {
+                      void uploadHeroBackground(file as File)
+                        .then(() => onSuccess?.({}))
+                        .catch((error: Error) => {
+                          api.error(error.message || 'Could not upload hero background.')
+                          onError?.(error)
+                        })
+                    }}
+                  >
+                    <Button icon={<UploadOutlined />} loading={uploadingHeroBackground}>
+                      Upload background
+                    </Button>
+                  </Upload>
+                </div>
+                <p className="mb-0 mt-2 text-xs text-slate-500">
+                  Optional. This image fills the full hero section; your primary colour remains the fallback.
+                </p>
+              </div>
+            )
+          }}
         </Form.Item>
         <Form.Item name="heroImageUrls" hidden>
+          <Input />
+        </Form.Item>
+        <Form.Item name="heroImageCaptions" hidden>
           <Input />
         </Form.Item>
         <Form.Item shouldUpdate noStyle>
           {() => {
             const images = heroImages()
+            const captions = heroCaptions()
             return (
-              <div className="mb-6">
+              <div className="border border-slate-200 p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <label className="font-medium">Hero images</label>
                   <span className="text-xs text-slate-500">
@@ -501,26 +600,42 @@ export function StorefrontSettings() {
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {images.map((url, index) => (
-                    <div key={url} className="relative h-24 w-36 overflow-hidden border border-slate-200">
-                      <Image
-                        src={url}
-                        alt={`Hero image ${index + 1}`}
-                        className="h-full w-full object-cover"
-                        preview
-                      />
-                      <Button
-                        danger
-                        type="text"
-                        size="small"
-                        className="!absolute right-0 top-0 !bg-white"
-                        aria-label={`Remove hero image ${index + 1}`}
-                        icon={<DeleteOutlined />}
-                        onClick={() =>
-                          form.setFieldValue(
-                            'heroImageUrls',
-                            images.filter((_, itemIndex) => itemIndex !== index),
-                          )
-                        }
+                    <div key={url} className="w-44 space-y-2">
+                      <div className="relative h-24 overflow-hidden border border-slate-200">
+                        <Image
+                          src={url}
+                          alt={`Hero image ${index + 1}`}
+                          className="h-full w-full object-cover"
+                          preview
+                        />
+                        <Button
+                          danger
+                          type="text"
+                          size="small"
+                          className="!absolute right-0 top-0 !bg-white"
+                          aria-label={`Remove hero image ${index + 1}`}
+                          icon={<DeleteOutlined />}
+                          onClick={() => {
+                            form.setFieldValue(
+                              'heroImageUrls',
+                              images.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                            form.setFieldValue(
+                              'heroImageCaptions',
+                              captions.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }}
+                        />
+                      </div>
+                      <Input
+                        value={captions[index] ?? ''}
+                        maxLength={100}
+                        placeholder={`Image ${index + 1} caption (optional)`}
+                        onChange={(event) => {
+                          const nextCaptions = [...captions]
+                          nextCaptions[index] = event.target.value
+                          form.setFieldValue('heroImageCaptions', nextCaptions)
+                        }}
                       />
                     </div>
                   ))}
@@ -544,12 +659,14 @@ export function StorefrontSettings() {
                   )}
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  Maximum two images. JPG, PNG, or WebP, up to 5 MB each.
+                  Maximum two images. Add an optional caption for each slide. JPG, PNG, or WebP, up to 5 MB
+                  each.
                 </p>
               </div>
             )
           }}
         </Form.Item>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Form.Item name="phone" label="Phone">
             <Input />
