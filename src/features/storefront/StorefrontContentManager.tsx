@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -20,12 +20,13 @@ import { supabase } from '../../supabase'
 
 type Section = {
   id: string
-  section_type: 'text' | 'banner' | 'collection' | 'testimonials'
+  section_type: 'text' | 'banner' | 'collection' | 'testimonials' | 'faq'
   title: string
   body?: string
   image_url?: string
   cta_label?: string
   cta_url?: string
+  collection_category?: string
   position: number
   visible: boolean
 }
@@ -47,6 +48,7 @@ const labels: Record<Section['section_type'], string> = {
   banner: 'Promotion banner',
   collection: 'Featured products',
   testimonials: 'Testimonials',
+  faq: 'Frequently asked questions',
 }
 
 export function StorefrontContentManager() {
@@ -54,6 +56,7 @@ export function StorefrontContentManager() {
   const [storeId, setStoreId] = useState<string>()
   const [sections, setSections] = useState<Section[]>([])
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
+  const [categories, setCategories] = useState<string[]>([])
   const [editingSection, setEditingSection] = useState<Section>()
   const [editingTestimonial, setEditingTestimonial] = useState<Testimonial>()
   const [sectionOpen, setSectionOpen] = useState(false)
@@ -61,6 +64,7 @@ export function StorefrontContentManager() {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingKey, setDeletingKey] = useState<string>()
+  const [movingId, setMovingId] = useState<string>()
   const [sectionForm] = Form.useForm<SectionValues>()
   const [testimonialForm] = Form.useForm<TestimonialValues>()
   const load = useCallback(async () => {
@@ -73,10 +77,10 @@ export function StorefrontContentManager() {
       : { data: null }
     if (!profile) return
     setStoreId(profile.store_id)
-    const [a, b] = await Promise.all([
+    const [a, b, categoryResult] = await Promise.all([
       supabase
         .from('storefront_sections')
-        .select('id,section_type,title,body,image_url,cta_label,cta_url,position,visible')
+        .select('id,section_type,title,body,image_url,cta_label,cta_url,collection_category,position,visible')
         .eq('store_id', profile.store_id)
         .order('position'),
       supabase
@@ -84,12 +88,14 @@ export function StorefrontContentManager() {
         .select('id,customer_name,customer_title,quote,rating,photo_url,verified,published,position')
         .eq('store_id', profile.store_id)
         .order('position'),
+      supabase.from('categories').select('name').eq('store_id', profile.store_id),
     ])
     if (a.error || b.error)
       api.error(a.error?.message ?? b.error?.message ?? 'Could not load storefront content.')
     else {
       setSections((a.data ?? []) as Section[])
       setTestimonials((b.data ?? []) as Testimonial[])
+      setCategories((categoryResult.data ?? []).map((item) => item.name).sort((a, b) => a.localeCompare(b)))
     }
   }, [api])
   useEffect(() => {
@@ -153,6 +159,22 @@ export function StorefrontContentManager() {
       setDeletingKey(undefined)
     }
   }
+  const moveSection = async (section: Section, direction: 'up' | 'down') => {
+    if (!supabase) return
+    setMovingId(section.id)
+    try {
+      const { error } = await supabase.rpc('move_current_storefront_section', {
+        p_section_id: section.id,
+        p_direction: direction,
+      })
+      if (error) throw error
+      await load()
+    } catch (error) {
+      api.error(error instanceof Error ? error.message : 'Could not rearrange homepage sections.')
+    } finally {
+      setMovingId(undefined)
+    }
+  }
   const uploadVisual = async (
     file: File,
     folder: 'sections' | 'testimonials',
@@ -200,14 +222,30 @@ export function StorefrontContentManager() {
       >
         <p className="mb-4 text-sm text-slate-500">
           Add up to eight sections, including two promotional banners. Upload an image for any section where
-          you want a visual.
+          you want a visual. Use the arrows to arrange the order visitors see.
         </p>
         {sections.length ? (
           <List
             dataSource={sections}
-            renderItem={(section) => (
+            renderItem={(section, index) => (
               <List.Item
                 actions={[
+                  <Button
+                    key="up"
+                    aria-label="Move section up"
+                    icon={<ArrowUpOutlined />}
+                    loading={movingId === section.id}
+                    disabled={index === 0 || Boolean(movingId)}
+                    onClick={() => void moveSection(section, 'up')}
+                  />,
+                  <Button
+                    key="down"
+                    aria-label="Move section down"
+                    icon={<ArrowDownOutlined />}
+                    loading={movingId === section.id}
+                    disabled={index === sections.length - 1 || Boolean(movingId)}
+                    onClick={() => void moveSection(section, 'down')}
+                  />,
                   <Button
                     key="edit"
                     icon={<EditOutlined />}
@@ -342,7 +380,33 @@ export function StorefrontContentManager() {
             <Input />
           </Form.Item>
           <Form.Item name="body" label="Content">
-            <Input.TextArea rows={3} />
+            <Input.TextArea rows={sectionForm.getFieldValue('section_type') === 'faq' ? 6 : 3} />
+          </Form.Item>
+          <Form.Item shouldUpdate noStyle>
+            {() =>
+              sectionForm.getFieldValue('section_type') === 'faq' && (
+                <p className="-mt-4 mb-5 text-xs text-slate-500">
+                  Add one question per line using: <strong>Question | Answer</strong>
+                </p>
+              )
+            }
+          </Form.Item>
+          <Form.Item shouldUpdate noStyle>
+            {() =>
+              sectionForm.getFieldValue('section_type') === 'collection' && (
+                <Form.Item
+                  name="collection_category"
+                  label="Products to show"
+                  extra="Choose a category, or leave this empty to show your featured products."
+                >
+                  <Select
+                    allowClear
+                    placeholder="Featured products"
+                    options={categories.map((category) => ({ value: category, label: category }))}
+                  />
+                </Form.Item>
+              )
+            }
           </Form.Item>
           <Form.Item name="image_url" hidden>
             <Input />

@@ -12,7 +12,7 @@ import {
   StarFilled,
   WhatsAppOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Pagination, Tag } from 'antd'
+import { Button, Empty, Form, Input, Pagination, Tag, message } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { formatNaira } from '../lib/currency'
@@ -37,6 +37,12 @@ type Storefront = {
   vision?: string
   mission?: string
   trust_stats?: Array<{ value: string; label: string }>
+  business_hours?: Array<{ day?: string; hours?: string }>
+  map_url?: string
+  social_links?: Record<string, string>
+  seo_title?: string
+  seo_description?: string
+  social_image_url?: string
 }
 type Product = {
   id: string
@@ -52,12 +58,13 @@ type Product = {
 }
 type Section = {
   id: string
-  section_type: 'text' | 'banner' | 'collection' | 'testimonials'
+  section_type: 'text' | 'banner' | 'collection' | 'testimonials' | 'faq'
   title: string
   body?: string
   image_url?: string
   cta_label?: string
   cta_url?: string
+  collection_category?: string
   position: number
 }
 type Testimonial = {
@@ -105,6 +112,16 @@ export function StorefrontPage() {
     () => products.find((product) => product.id === productId),
     [productId, products],
   )
+
+  const trackStorefrontEvent = (eventType: 'page_view' | 'product_view' | 'whatsapp_click', product?: Product) => {
+    if (!supabase || !slug) return
+    void supabase.rpc('record_storefront_event', {
+      p_slug: slug,
+      p_event_type: eventType,
+      p_product_id: product?.id ?? null,
+      p_path: window.location.pathname,
+    })
+  }
 
   useEffect(() => {
     if (!customDomainHost || !supabase) return
@@ -171,6 +188,25 @@ export function StorefrontPage() {
     }
   }, [customDomainResolved, slug])
 
+  useEffect(() => {
+    if (!store) return
+    document.title = store.seo_title || `${store.store_name} | Online shop`
+    const description = store.seo_description || store.description
+    let descriptionTag = document.querySelector('meta[name="description"]')
+    if (!descriptionTag) {
+      descriptionTag = document.createElement('meta')
+      descriptionTag.setAttribute('name', 'description')
+      document.head.appendChild(descriptionTag)
+    }
+    if (description) descriptionTag.setAttribute('content', description)
+  }, [store])
+
+  useEffect(() => {
+    if (store) trackStorefrontEvent(selectedProduct ? 'product_view' : 'page_view', selectedProduct)
+    // Track page/product impressions only when the public route changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store?.slug, pathname, selectedProduct?.id])
+
   if (loading)
     return (
       <main
@@ -227,6 +263,7 @@ export function StorefrontPage() {
           icon={<WhatsAppOutlined />}
           href={whatsappUrl}
           target="_blank"
+          onClick={() => trackStorefrontEvent('whatsapp_click')}
         >
           Order on WhatsApp
         </Button>
@@ -278,6 +315,7 @@ export function StorefrontPage() {
                 style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
                 href={whatsappUrl}
                 target="_blank"
+                onClick={() => trackStorefrontEvent('whatsapp_click')}
                 className="hidden sm:inline-flex"
               >
                 Order now
@@ -367,6 +405,19 @@ export function StorefrontPage() {
           primaryColor={primaryColor}
           template={store.template_key ?? 'classic_retail'}
         />
+      )}
+
+      {whatsappUrl && (
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => trackStorefrontEvent('whatsapp_click')}
+          className="fixed bottom-5 right-5 z-30 grid h-12 w-12 place-items-center rounded-full bg-[#25D366] text-xl text-white shadow-lg transition hover:scale-105"
+          aria-label="Chat with us on WhatsApp"
+        >
+          <WhatsAppOutlined />
+        </a>
       )}
 
       <footer className="mt-auto border-t border-slate-200 bg-slate-50">
@@ -506,7 +557,7 @@ function HomePage({
                     primaryColor={primaryColor}
                   />
                 ))}
-                {featured.length > 0 && collectionSections.length === 0 && (
+                {featured.length > 0 && !collectionSections.some((section) => !section.collection_category) && (
                   <StorefrontCollection
                     eyebrow="Popular picks"
                     title="Featured products"
@@ -799,10 +850,37 @@ function CustomSection({
   compact?: boolean
 }) {
   if (section.section_type === 'collection')
-    return (
-      <StorefrontCollection eyebrow="Curated" title={section.title} products={products} baseUrl={baseUrl} />
-    )
+    {
+      const collectionProducts = section.collection_category
+        ? products.filter(
+            (product) => (product.category || 'Products').toLowerCase() === section.collection_category?.toLowerCase(),
+          )
+        : products
+      return <StorefrontCollection eyebrow="Curated" title={section.title} products={collectionProducts} baseUrl={baseUrl} />
+    }
   if (section.section_type === 'testimonials') return null
+  if (section.section_type === 'faq') {
+    const questions = (section.body ?? '')
+      .split('\n')
+      .map((line) => line.split('|').map((item) => item.trim()))
+      .filter(([question, answer]) => question && answer)
+    return questions.length ? (
+      <section className="mb-16 border-y border-slate-200 py-14">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Helpful information</p>
+        <h2 className="mb-8 mt-2 text-3xl font-semibold">{section.title}</h2>
+        <div className="divide-y divide-slate-200 border-y border-slate-200">
+          {questions.map(([question, answer]) => (
+            <details key={question} className="group py-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-5 font-semibold text-[#0B1121]">
+                {question}<span className="text-xl font-normal text-slate-400 group-open:rotate-45">+</span>
+              </summary>
+              <p className="mb-0 mt-3 max-w-3xl leading-7 text-slate-600">{answer}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    ) : null
+  }
   if (section.section_type === 'banner') {
     const hasCta = Boolean(section.cta_label && section.cta_url)
     const content = (
@@ -1047,8 +1125,96 @@ function ContactPage({
           </div>
           <div className="mt-8">{actions}</div>
         </div>
+        <LeadCaptureForm slug={store.slug} />
+        {(store.business_hours?.length || store.map_url || Object.keys(store.social_links ?? {}).length) && (
+          <div className="mt-8 grid gap-5 border-t border-slate-200 pt-8 sm:grid-cols-2">
+            <div>
+              {store.business_hours?.length ? (
+                <>
+                  <h3 className="text-lg font-semibold">Opening hours</h3>
+                  <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    {store.business_hours.map((item, index) => (
+                      <p key={`${item.day}-${index}`} className="m-0 flex justify-between gap-4">
+                        <span>{item.day}</span><span>{item.hours}</span>
+                      </p>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              {store.map_url && (
+                <a className="mt-5 inline-flex font-medium text-[#0B1121] underline" href={store.map_url} target="_blank" rel="noreferrer">
+                  View our location on Google Maps
+                </a>
+              )}
+            </div>
+            {Object.keys(store.social_links ?? {}).length ? (
+              <div>
+                <h3 className="text-lg font-semibold">Follow us</h3>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {Object.entries(store.social_links ?? {}).map(([network, url]) => (
+                    <a key={network} href={url} target="_blank" rel="noreferrer" className="border border-slate-200 px-3 py-2 text-sm font-medium capitalize hover:border-slate-400">
+                      {network}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
       </section>
     </>
+  )
+}
+
+function LeadCaptureForm({ slug, product }: { slug: string; product?: Product }) {
+  const [form] = Form.useForm<{ name: string; phone: string; email?: string; message?: string }>()
+  const [api, holder] = message.useMessage()
+  const [submitting, setSubmitting] = useState(false)
+  const submit = async (values: { name: string; phone: string; email?: string; message?: string }) => {
+    if (!supabase) return
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.rpc('submit_storefront_lead', {
+        p_slug: slug,
+        p_name: values.name,
+        p_phone: values.phone,
+        p_email: values.email || null,
+        p_message: values.message || null,
+        p_product_id: product?.id ?? null,
+      })
+      if (error) throw error
+      form.resetFields()
+      api.success('Thanks — the business will contact you shortly.')
+    } catch (error) {
+      api.error(error instanceof Error ? error.message : 'Could not send your enquiry.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  return (
+    <section className="mt-8 border border-slate-200 p-6 sm:p-8">
+      {holder}
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Send an enquiry</p>
+      <h2 className="mt-2 text-2xl font-semibold">We will get back to you.</h2>
+      {product && <p className="text-sm text-slate-500">Enquiry about: {product.name}</p>}
+      <Form form={form} layout="vertical" onFinish={(values) => void submit(values)} className="mt-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Form.Item name="name" label="Your name" rules={[{ required: true, min: 2 }]}>
+            <Input autoComplete="name" />
+          </Form.Item>
+          <Form.Item name="phone" label="Phone number" rules={[{ required: true, min: 7 }]}>
+            <Input inputMode="tel" autoComplete="tel" />
+          </Form.Item>
+        </div>
+        <Form.Item name="email" label="Email (optional)" rules={[{ type: 'email' }]}>
+          <Input inputMode="email" autoComplete="email" />
+        </Form.Item>
+        <Form.Item name="message" label="How can we help?">
+          <Input.TextArea rows={3} />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" loading={submitting}>Send enquiry</Button>
+      </Form>
+    </section>
   )
 }
 
@@ -1117,6 +1283,10 @@ function ProductPage({
       ? [product.image_url]
       : []
   const mainImage = selectedImage && images.includes(selectedImage) ? selectedImage : images[0]
+  const productWhatsappUrl = store.whatsapp
+    ? `https://wa.me/${store.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello, I would like to order ${product.name}.`)}`
+    : undefined
+  const primaryColor = /^#[0-9A-Fa-f]{6}$/.test(store.primary_color ?? '') ? store.primary_color : '#0B1121'
   return (
     <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:py-16">
       <Link to={baseUrl || '/'} className="text-sm font-medium text-slate-600">
@@ -1161,7 +1331,27 @@ function ProductPage({
               onSelect={setSelectedImage}
             />
           )}
-          <div className="mt-10">{actions}</div>
+          <div className="mt-10 flex flex-wrap gap-3">
+            {productWhatsappUrl ? (
+              <Button
+                type="primary"
+                size="large"
+                icon={<WhatsAppOutlined />}
+                style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
+                href={productWhatsappUrl}
+                target="_blank"
+              >
+                Order this product on WhatsApp
+              </Button>
+            ) : (
+              actions
+            )}
+            {productWhatsappUrl && store.phone && (
+              <Button size="large" icon={<PhoneOutlined />} href={`tel:${store.phone}`}>
+                Call store
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </section>

@@ -9,6 +9,7 @@ import { BillingPanel } from '../features/billing/BillingPanel'
 import { SupportTicketForm } from '../features/support/SupportTicketForm'
 import { StorefrontSettings } from '../features/storefront/StorefrontSettings'
 import { StorefrontContentManager } from '../features/storefront/StorefrontContentManager'
+import { StorefrontLeads } from '../features/storefront/StorefrontLeads'
 import { PrinterSettingsPanel } from '../features/printing/PrinterSettingsPanel'
 import {
   defaultStoreSettings,
@@ -157,6 +158,7 @@ export function SettingsPage({ role }: { role: Role }) {
       items={[
         { key: 'identity', label: 'Brand & contact', children: <StorefrontSettings /> },
         { key: 'content', label: 'Homepage content', children: <StorefrontContentManager /> },
+        { key: 'leads', label: 'Customer enquiries', children: <StorefrontLeads /> },
       ]}
     />
   )

@@ -1,5 +1,5 @@
 import { CopyOutlined, DeleteOutlined, GlobalOutlined, UploadOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Form, Image, Input, Radio, Switch, Tag, Upload, message } from 'antd'
+import { Alert, Button, Card, Form, Image, Input, Radio, Statistic, Switch, Tag, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabase'
 
@@ -21,6 +21,14 @@ type Values = {
   vision?: string
   mission?: string
   trustStats?: Array<{ value?: string; label?: string }>
+  businessHours?: Array<{ day?: string; hours?: string }>
+  mapUrl?: string
+  instagramUrl?: string
+  facebookUrl?: string
+  tiktokUrl?: string
+  seoTitle?: string
+  seoDescription?: string
+  socialImageUrl?: string
 }
 
 type CustomDomain = {
@@ -57,6 +65,7 @@ export function StorefrontSettings() {
   const [customDomain, setCustomDomain] = useState<CustomDomain>()
   const [requestedDomain, setRequestedDomain] = useState('')
   const [requestingDomain, setRequestingDomain] = useState(false)
+  const [insights, setInsights] = useState({ views: 0, productViews: 0, whatsappClicks: 0, leads: 0 })
 
   useEffect(() => {
     if (!supabase) return
@@ -69,16 +78,34 @@ export function StorefrontSettings() {
         : { data: null }
       if (!profile) return
       setStoreId(profile.store_id)
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       const [storeResult, storefrontResult] = await Promise.all([
         supabase.from('stores').select('organization_id').eq('id', profile.store_id).maybeSingle(),
         supabase
           .from('storefronts')
           .select(
-            'slug,enabled,template_key,headline,description,phone,whatsapp,address,primary_color,hero_image_urls,hero_image_captions,hero_background_url,logo_url,vision,mission,trust_stats',
+            'slug,enabled,template_key,headline,description,phone,whatsapp,address,primary_color,hero_image_urls,hero_image_captions,hero_background_url,logo_url,vision,mission,trust_stats,business_hours,map_url,social_links,seo_title,seo_description,social_image_url',
           )
           .eq('store_id', profile.store_id)
           .maybeSingle(),
       ])
+      const [eventsResult, leadsResult] = await Promise.all([
+        supabase
+          .from('storefront_events')
+          .select('event_type')
+          .eq('store_id', profile.store_id)
+          .gte('created_at', since),
+        supabase.from('storefront_leads').select('id').eq('store_id', profile.store_id).gte('created_at', since),
+      ])
+      if (!eventsResult.error && !leadsResult.error) {
+        const events = eventsResult.data ?? []
+        setInsights({
+          views: events.filter((event) => event.event_type === 'page_view').length,
+          productViews: events.filter((event) => event.event_type === 'product_view').length,
+          whatsappClicks: events.filter((event) => event.event_type === 'whatsapp_click').length,
+          leads: leadsResult.data?.length ?? 0,
+        })
+      }
       if (storeResult.data) {
         const [organizationResult, brandingEntitlementResult, customDomainEntitlementResult, domainResult] =
           await Promise.all([
@@ -109,6 +136,16 @@ export function StorefrontSettings() {
           trustStats: Array.isArray(storefrontResult.data.trust_stats)
             ? storefrontResult.data.trust_stats
             : [],
+          businessHours: Array.isArray(storefrontResult.data.business_hours)
+            ? storefrontResult.data.business_hours
+            : [],
+          mapUrl: storefrontResult.data.map_url ?? undefined,
+          instagramUrl: storefrontResult.data.social_links?.instagram ?? undefined,
+          facebookUrl: storefrontResult.data.social_links?.facebook ?? undefined,
+          tiktokUrl: storefrontResult.data.social_links?.tiktok ?? undefined,
+          seoTitle: storefrontResult.data.seo_title ?? undefined,
+          seoDescription: storefrontResult.data.seo_description ?? undefined,
+          socialImageUrl: storefrontResult.data.social_image_url ?? undefined,
         })
     })()
   }, [form])
@@ -221,6 +258,18 @@ export function StorefrontSettings() {
           trust_stats: (values.trustStats ?? [])
             .filter((stat) => stat.value?.trim() && stat.label?.trim())
             .slice(0, 4),
+          business_hours: (values.businessHours ?? [])
+            .filter((item) => item.day?.trim() && item.hours?.trim())
+            .slice(0, 7),
+          map_url: values.mapUrl || null,
+          social_links: {
+            ...(values.instagramUrl?.trim() ? { instagram: values.instagramUrl.trim() } : {}),
+            ...(values.facebookUrl?.trim() ? { facebook: values.facebookUrl.trim() } : {}),
+            ...(values.tiktokUrl?.trim() ? { tiktok: values.tiktokUrl.trim() } : {}),
+          },
+          seo_title: values.seoTitle || null,
+          seo_description: values.seoDescription || null,
+          social_image_url: values.socialImageUrl || null,
         },
       })
       if (error) api.error(error.message)
@@ -254,6 +303,12 @@ export function StorefrontSettings() {
       <p className="text-sm text-slate-500">
         Create a branded public catalogue. Only products marked as published online will appear.
       </p>
+      <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden border border-slate-200 bg-slate-200 sm:grid-cols-4">
+        <div className="bg-white p-4"><Statistic title="Views · 30 days" value={insights.views} /></div>
+        <div className="bg-white p-4"><Statistic title="Product views" value={insights.productViews} /></div>
+        <div className="bg-white p-4"><Statistic title="WhatsApp clicks" value={insights.whatsappClicks} /></div>
+        <div className="bg-white p-4"><Statistic title="Enquiries" value={insights.leads} /></div>
+      </div>
       <Form
         form={form}
         layout="vertical"
@@ -265,10 +320,11 @@ export function StorefrontSettings() {
           heroImageCaptions: [],
         }}
         onFinish={(values) => void save(values)}
-        className="mt-5"
+        className="mt-5 grid gap-x-5 lg:grid-cols-2"
       >
         <Form.Item
           name="templateKey"
+          className="lg:col-span-2"
           label="Storefront template"
           extra="You can change the design anytime; products, links, and content stay the same."
         >
@@ -342,7 +398,7 @@ export function StorefrontSettings() {
           }}
         </Form.Item>
         {canUseCustomDomains && (
-          <div className="mb-6 border border-slate-200 p-4">
+          <div className="mb-6 border border-slate-200 p-4 lg:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="font-medium text-[#0B1121]">Custom domain</div>
@@ -412,7 +468,7 @@ export function StorefrontSettings() {
         <Form.Item name="description" label="Store description">
           <Input.TextArea rows={3} />
         </Form.Item>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
           <Form.Item name="vision" label="Vision statement">
             <Input.TextArea rows={3} placeholder="Where we are going." />
           </Form.Item>
@@ -422,7 +478,7 @@ export function StorefrontSettings() {
         </div>
         <Form.List name="trustStats">
           {(fields, { add, remove }) => (
-            <div className="mb-6">
+            <div className="mb-6 lg:col-span-2">
               <div className="mb-2 flex items-center justify-between">
                 <label className="font-medium">Trust statistics</label>
                 <Button size="small" disabled={fields.length >= 4} onClick={() => add({})}>
@@ -456,14 +512,14 @@ export function StorefrontSettings() {
         </Form.Item>
         {!canUseLogo && (
           <Alert
-            className="mb-6"
+            className="mb-6 lg:col-span-2"
             type="warning"
             showIcon
             message="Online storefront is available on Growth"
             description="Starter tenants can prepare content, but need Growth or higher to publish the public shop, use a custom logo, and accept customer visits."
           />
         )}
-        <div className="mb-6 grid gap-5 lg:grid-cols-2">
+        <div className="mb-6 grid gap-5 lg:col-span-2 lg:grid-cols-2">
           {canUseLogo && (
             <div className="border border-slate-200 p-4">
             <label className="mb-2 block font-medium">Storefront logo</label>
@@ -525,7 +581,7 @@ export function StorefrontSettings() {
             </Form.Item>
           </div>
         </div>
-        <div className="mb-6 grid gap-5 lg:grid-cols-2">
+        <div className="mb-6 grid gap-5 lg:col-span-2 lg:grid-cols-2">
         <Form.Item shouldUpdate noStyle>
           {() => {
             const heroBackgroundUrl = form.getFieldValue('heroBackgroundUrl') as string | undefined
@@ -667,7 +723,7 @@ export function StorefrontSettings() {
           }}
         </Form.Item>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
           <Form.Item name="phone" label="Phone">
             <Input />
           </Form.Item>
@@ -678,6 +734,67 @@ export function StorefrontSettings() {
         <Form.Item name="address" label="Address">
           <Input />
         </Form.Item>
+        <div className="mb-6 grid gap-5 lg:col-span-2 lg:grid-cols-2">
+          <div className="border border-slate-200 p-4">
+            <div className="mb-3 font-medium">Business details</div>
+            <Form.Item name="mapUrl" label="Google Maps link" extra="Paste a Google Maps share link." className="!mb-4">
+              <Input inputMode="url" placeholder="https://maps.google.com/..." />
+            </Form.Item>
+            <Form.List name="businessHours">
+              {(fields, { add, remove }) => (
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-medium">Opening hours</span>
+                    <Button size="small" onClick={() => add({})} disabled={fields.length >= 7}>
+                      Add hours
+                    </Button>
+                  </div>
+                  {fields.map((field) => (
+                    <div key={field.key} className="mb-2 grid grid-cols-[1fr_1.4fr_auto] gap-2">
+                      <Form.Item {...field} name={[field.name, 'day']} noStyle>
+                        <Input placeholder="Monday" />
+                      </Form.Item>
+                      <Form.Item {...field} name={[field.name, 'hours']} noStyle>
+                        <Input placeholder="8am – 6pm" />
+                      </Form.Item>
+                      <Button danger onClick={() => remove(field.name)} aria-label="Remove opening hours">
+                        <DeleteOutlined />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Form.List>
+          </div>
+          <div className="border border-slate-200 p-4">
+            <div className="mb-3 font-medium">Social links</div>
+            <div className="space-y-3">
+              <Form.Item name="instagramUrl" label="Instagram" className="!mb-0">
+                <Input inputMode="url" placeholder="https://instagram.com/..." />
+              </Form.Item>
+              <Form.Item name="facebookUrl" label="Facebook" className="!mb-0">
+                <Input inputMode="url" placeholder="https://facebook.com/..." />
+              </Form.Item>
+              <Form.Item name="tiktokUrl" label="TikTok" className="!mb-0">
+                <Input inputMode="url" placeholder="https://tiktok.com/..." />
+              </Form.Item>
+            </div>
+          </div>
+        </div>
+        <div className="mb-6 border border-slate-200 p-4 lg:col-span-2">
+          <div className="mb-3 font-medium">Search and sharing</div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Form.Item name="seoTitle" label="Page title" extra="Used in browser tabs and Google results.">
+              <Input maxLength={70} placeholder={`${storeName || 'Your business'} | Online shop`} />
+            </Form.Item>
+            <Form.Item name="socialImageUrl" label="Social-share image URL" extra="Optional image used when the link is shared.">
+              <Input inputMode="url" placeholder="https://..." />
+            </Form.Item>
+          </div>
+          <Form.Item name="seoDescription" label="Search description" extra="A concise summary for search engines and sharing." className="!mb-0">
+            <Input.TextArea rows={2} maxLength={160} />
+          </Form.Item>
+        </div>
         <Form.Item name="enabled" label="Publish storefront" valuePropName="checked">
           <Switch disabled={!canUseLogo} checkedChildren="Published" unCheckedChildren="Draft" />
         </Form.Item>
