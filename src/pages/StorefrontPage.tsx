@@ -81,6 +81,13 @@ function productImage(product: Product) {
   return product.image_urls?.[0] ?? product.image_url
 }
 
+function whatsappNumber(value?: string) {
+  const digits = value?.replace(/\D/g, '') ?? ''
+  if (digits.startsWith('2340')) return `234${digits.slice(4)}`
+  if (digits.startsWith('0') && digits.length === 11) return `234${digits.slice(1)}`
+  return digits
+}
+
 export function StorefrontPage() {
   const { mode } = useTheme()
   const { pathname } = useLocation()
@@ -246,7 +253,8 @@ export function StorefrontPage() {
       </div>
     )
 
-  const whatsappUrl = store.whatsapp ? `https://wa.me/${store.whatsapp.replace(/\D/g, '')}` : undefined
+  const whatsappRecipient = whatsappNumber(store.whatsapp)
+  const whatsappUrl = whatsappRecipient ? `https://wa.me/${whatsappRecipient}` : undefined
   const primaryColor = /^#[0-9A-Fa-f]{6}$/.test(store.primary_color ?? '') ? store.primary_color! : '#0B1121'
   const contactActions = (
     <div className="flex flex-wrap gap-3">
@@ -1283,8 +1291,9 @@ function ProductPage({
       ? [product.image_url]
       : []
   const mainImage = selectedImage && images.includes(selectedImage) ? selectedImage : images[0]
-  const productWhatsappUrl = store.whatsapp
-    ? `https://wa.me/${store.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello, I would like to order ${product.name}.`)}`
+  const productWhatsappRecipient = whatsappNumber(store.whatsapp)
+  const productWhatsappUrl = productWhatsappRecipient
+    ? `https://wa.me/${productWhatsappRecipient}?text=${encodeURIComponent(`Hello, I would like to order ${product.name}.`)}`
     : undefined
   const primaryColor = /^#[0-9A-Fa-f]{6}$/.test(store.primary_color ?? '') ? store.primary_color : '#0B1121'
   return (

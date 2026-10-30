@@ -728,7 +728,7 @@ export function StorefrontSettings() {
             <Input />
           </Form.Item>
           <Form.Item name="whatsapp" label="WhatsApp number">
-            <Input placeholder="2348012345678" />
+            <Input placeholder="2348012345678 or 08012345678" inputMode="tel" />
           </Form.Item>
         </div>
         <Form.Item name="address" label="Address">
