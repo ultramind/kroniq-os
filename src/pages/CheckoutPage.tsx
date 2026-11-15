@@ -132,7 +132,11 @@ export function CheckoutPage({
   const isOrderCheckout = orderOnly || paymentMethod === 'order'
   const findExactBarcodeProduct = (code: string) => {
     const normalized = code.trim()
-    return products.find((product) => product.sku.trim() === normalized)
+    return products.find(
+      (product) =>
+        product.sku.trim() === normalized ||
+        product.barcodeAliases?.some((alias) => alias.barcode.trim() === normalized),
+    )
   }
   const openScannedProduct = (code: string) => {
     const normalized = code.trim()

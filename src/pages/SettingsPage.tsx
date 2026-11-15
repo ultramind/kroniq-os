@@ -1,5 +1,18 @@
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { Button, Card, Collapse, Form, Input, InputNumber, Modal, Select, Switch, Tabs, message } from 'antd'
+import {
+  Button,
+  Card,
+  Collapse,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Select,
+  Switch,
+  Tabs,
+  message,
+} from 'antd'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { SeedStarterCatalogue } from '../features/admin/SeedStarterCatalogue'
@@ -21,12 +34,14 @@ import { supabase } from '../supabase'
 import type { Role } from '../types'
 import { clearLocalPosDataForNewTenant, db } from '../db'
 import { clearOfflineWorkspace } from '../lib/offlineWorkspace'
+import { pullProducts } from '../sync'
 
 type Values = StoreSettings
 
 export function SettingsPage({ role }: { role: Role }) {
   const [api, holder] = message.useMessage()
   const [savingStoreSettings, setSavingStoreSettings] = useState(false)
+  const [applyingLowStock, setApplyingLowStock] = useState(false)
   const [canUseStorefront, setCanUseStorefront] = useState(false)
   const [form] = Form.useForm<Values>()
   const { hash } = useLocation()
@@ -44,12 +59,14 @@ export function SettingsPage({ role }: { role: Role }) {
       if (!profile) return
       const { data: store } = await supabase
         .from('stores')
-        .select('organization_id,flexible_pricing_enabled')
+        .select('organization_id,flexible_pricing_enabled,default_low_stock_threshold')
         .eq('id', profile.store_id)
         .maybeSingle()
       if (!store) return
       if (store.flexible_pricing_enabled !== undefined)
         form.setFieldValue('flexiblePricingEnabled', store.flexible_pricing_enabled)
+      if (store.default_low_stock_threshold !== undefined)
+        form.setFieldValue('lowStock', store.default_low_stock_threshold)
       const { data: organization } = await supabase
         .from('organizations')
         .select('name')
@@ -97,6 +114,31 @@ export function SettingsPage({ role }: { role: Role }) {
       setSavingStoreSettings(false)
     }
   }
+  const applyLowStockToAllProducts = async () => {
+    const { lowStock } = await form.validateFields(['lowStock'])
+    if (!supabase) {
+      api.error('Connect to the internet to update all products.')
+      return
+    }
+    setApplyingLowStock(true)
+    try {
+      const { data, error } = await supabase.rpc('update_current_store_low_stock_settings', {
+        p_threshold: Number(lowStock),
+        p_apply_to_existing: true,
+      })
+      if (error) {
+        api.error(error.message)
+        return
+      }
+      const settings = { ...getStoreSettings(), ...form.getFieldsValue(), lowStock: Number(lowStock) }
+      saveStoreSettings(settings)
+      window.dispatchEvent(new CustomEvent('kroniq-settings-updated', { detail: settings }))
+      await pullProducts()
+      api.success(`Low-stock alert applied to ${data ?? 0} product${data === 1 ? '' : 's'}.`)
+    } finally {
+      setApplyingLowStock(false)
+    }
+  }
   const storeSettings = (
     <Card title="Store settings" className="max-w-2xl">
       <Form
@@ -126,8 +168,27 @@ export function SettingsPage({ role }: { role: Role }) {
           <Form.Item name="vat" label="VAT (%)">
             <InputNumber min={0} max={100} className="w-full" />
           </Form.Item>
-          <Form.Item name="lowStock" label="Low-stock threshold">
-            <InputNumber min={0} className="w-full" />
+          <Form.Item
+            label="Default low-stock alert"
+            extra="Use this level for new products, or apply it to every existing product. You can still set a different alert on any individual product."
+          >
+            <div className="flex gap-2">
+              <Form.Item
+                name="lowStock"
+                noStyle
+                rules={[{ required: true, message: 'Enter an alert quantity.' }]}
+              >
+                <InputNumber min={0} precision={0} inputMode="numeric" className="min-w-0 flex-1" />
+              </Form.Item>
+              <Popconfirm
+                title="Apply this alert level to all products?"
+                description="This replaces every product’s current low-stock alert level."
+                okText="Apply to all"
+                onConfirm={() => void applyLowStockToAllProducts()}
+              >
+                <Button loading={applyingLowStock}>Apply to all</Button>
+              </Popconfirm>
+            </div>
           </Form.Item>
         </div>
         <Card size="small" title="Checkout controls" className="checkout-controls mb-6">

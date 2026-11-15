@@ -21,6 +21,7 @@ import { exportSalesCsv } from '../features/sales/exportSalesCsv'
 import { ProfitReport } from '../features/sales/ProfitReport'
 import { ServiceDashboard } from '../features/services/ServiceDashboard'
 import { formatNaira } from '../lib/currency'
+import { getStoreSettings } from '../lib/storeSettings'
 import { supabase } from '../supabase'
 import type { Product, Role, Sale } from '../types'
 
@@ -235,7 +236,9 @@ export function ReportsPage({ sales, role }: { sales: Sale[]; role: Role }) {
   )
   const today = dayjs().format('YYYY-MM-DD')
   const activeProducts = products.filter((product) => product.active !== false)
-  const lowStock = activeProducts.filter((product) => product.stock <= (product.lowStockThreshold ?? 10))
+  const lowStock = activeProducts.filter(
+    (product) => product.stock <= (product.lowStockThreshold ?? getStoreSettings().lowStock),
+  )
   const stockAtCost = activeProducts.reduce((total, product) => total + product.stock * product.costPrice, 0)
   const stockAtRetail = activeProducts.reduce((total, product) => total + product.stock * product.price, 0)
   const productsSold = useMemo(() => {

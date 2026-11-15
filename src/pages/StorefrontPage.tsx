@@ -120,7 +120,10 @@ export function StorefrontPage() {
     [productId, products],
   )
 
-  const trackStorefrontEvent = (eventType: 'page_view' | 'product_view' | 'whatsapp_click', product?: Product) => {
+  const trackStorefrontEvent = (
+    eventType: 'page_view' | 'product_view' | 'whatsapp_click',
+    product?: Product,
+  ) => {
     if (!supabase || !slug) return
     void supabase.rpc('record_storefront_event', {
       p_slug: slug,
@@ -565,14 +568,15 @@ function HomePage({
                     primaryColor={primaryColor}
                   />
                 ))}
-                {featured.length > 0 && !collectionSections.some((section) => !section.collection_category) && (
-                  <StorefrontCollection
-                    eyebrow="Popular picks"
-                    title="Featured products"
-                    products={featured}
-                    baseUrl={baseUrl}
-                  />
-                )}
+                {featured.length > 0 &&
+                  !collectionSections.some((section) => !section.collection_category) && (
+                    <StorefrontCollection
+                      eyebrow="Popular picks"
+                      title="Featured products"
+                      products={featured}
+                      baseUrl={baseUrl}
+                    />
+                  )}
                 {recent.length > 0 && (
                   <StorefrontCollection
                     eyebrow="Just in"
@@ -802,7 +806,9 @@ function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) 
             <p className="leading-7 text-slate-600">“{item.quote}”</p>
             <p className="mt-5 font-semibold">
               {item.customer_name}{' '}
-              {item.verified && <span className="text-xs font-medium text-emerald-700">· Verified customer</span>}
+              {item.verified && (
+                <span className="text-xs font-medium text-emerald-700">· Verified customer</span>
+              )}
             </p>
             {item.customer_title && <p className="text-sm text-slate-500">{item.customer_title}</p>}
           </article>
@@ -857,15 +863,22 @@ function CustomSection({
   primaryColor: string
   compact?: boolean
 }) {
-  if (section.section_type === 'collection')
-    {
-      const collectionProducts = section.collection_category
-        ? products.filter(
-            (product) => (product.category || 'Products').toLowerCase() === section.collection_category?.toLowerCase(),
-          )
-        : products
-      return <StorefrontCollection eyebrow="Curated" title={section.title} products={collectionProducts} baseUrl={baseUrl} />
-    }
+  if (section.section_type === 'collection') {
+    const collectionProducts = section.collection_category
+      ? products.filter(
+          (product) =>
+            (product.category || 'Products').toLowerCase() === section.collection_category?.toLowerCase(),
+        )
+      : products
+    return (
+      <StorefrontCollection
+        eyebrow="Curated"
+        title={section.title}
+        products={collectionProducts}
+        baseUrl={baseUrl}
+      />
+    )
+  }
   if (section.section_type === 'testimonials') return null
   if (section.section_type === 'faq') {
     const questions = (section.body ?? '')
@@ -874,13 +887,16 @@ function CustomSection({
       .filter(([question, answer]) => question && answer)
     return questions.length ? (
       <section className="mb-16 border-y border-slate-200 py-14">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Helpful information</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Helpful information
+        </p>
         <h2 className="mb-8 mt-2 text-3xl font-semibold">{section.title}</h2>
         <div className="divide-y divide-slate-200 border-y border-slate-200">
           {questions.map(([question, answer]) => (
             <details key={question} className="group py-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-5 font-semibold text-[#0B1121]">
-                {question}<span className="text-xl font-normal text-slate-400 group-open:rotate-45">+</span>
+                {question}
+                <span className="text-xl font-normal text-slate-400 group-open:rotate-45">+</span>
               </summary>
               <p className="mb-0 mt-3 max-w-3xl leading-7 text-slate-600">{answer}</p>
             </details>
@@ -892,7 +908,9 @@ function CustomSection({
   if (section.section_type === 'banner') {
     const hasCta = Boolean(section.cta_label && section.cta_url)
     const content = (
-      <div className={`relative overflow-hidden bg-slate-100 ${compact ? 'min-h-56' : 'min-h-48 sm:min-h-64'}`}>
+      <div
+        className={`relative overflow-hidden bg-slate-100 ${compact ? 'min-h-56' : 'min-h-48 sm:min-h-64'}`}
+      >
         {section.image_url ? (
           <img
             src={section.image_url}
@@ -927,7 +945,9 @@ function CustomSection({
         </a>
       </section>
     ) : (
-      <section className={`${compact ? '' : 'mb-10'} overflow-hidden border border-slate-200`}>{content}</section>
+      <section className={`${compact ? '' : 'mb-10'} overflow-hidden border border-slate-200`}>
+        {content}
+      </section>
     )
   }
   return (
@@ -976,7 +996,9 @@ function CategoryPage({
     ? categories.find((category) => category.toLowerCase() === categoryName.toLowerCase())
     : undefined
   const categoryProducts = matchingCategory
-    ? products.filter((product) => (product.category || 'Products').toLowerCase() === matchingCategory.toLowerCase())
+    ? products.filter(
+        (product) => (product.category || 'Products').toLowerCase() === matchingCategory.toLowerCase(),
+      )
     : []
 
   if (categoryName && !matchingCategory)
@@ -1008,21 +1030,35 @@ function CategoryPage({
                 {categoryProducts.length} {categoryProducts.length === 1 ? 'product' : 'products'} available
               </p>
             </div>
-            <Link to={`${baseUrl}/categories`} className="text-sm font-medium text-slate-600 hover:text-[#0B1121]">
+            <Link
+              to={`${baseUrl}/categories`}
+              className="text-sm font-medium text-slate-600 hover:text-[#0B1121]"
+            >
               <ArrowLeftOutlined /> All categories
             </Link>
           </div>
-          <ProductGrid products={categoryProducts} baseUrl={baseUrl} empty="No products are available in this category." />
+          <ProductGrid
+            products={categoryProducts}
+            baseUrl={baseUrl}
+            empty="No products are available in this category."
+          />
         </section>
       </>
     )
 
   return (
     <>
-      <StorefrontPageHero store={store} baseUrl={baseUrl} title="Shop by category" primaryColor={primaryColor} />
+      <StorefrontPageHero
+        store={store}
+        baseUrl={baseUrl}
+        title="Shop by category"
+        primaryColor={primaryColor}
+      />
       <section className="mx-auto w-full max-w-7xl px-5 py-10 sm:py-16">
         <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Browse the catalogue</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Browse the catalogue
+          </p>
           <h2 className="mt-2 text-3xl font-semibold">Choose a category</h2>
         </div>
         {categories.length ? (
@@ -1143,14 +1179,20 @@ function ContactPage({
                   <div className="mt-3 space-y-2 text-sm text-slate-600">
                     {store.business_hours.map((item, index) => (
                       <p key={`${item.day}-${index}`} className="m-0 flex justify-between gap-4">
-                        <span>{item.day}</span><span>{item.hours}</span>
+                        <span>{item.day}</span>
+                        <span>{item.hours}</span>
                       </p>
                     ))}
                   </div>
                 </>
               ) : null}
               {store.map_url && (
-                <a className="mt-5 inline-flex font-medium text-[#0B1121] underline" href={store.map_url} target="_blank" rel="noreferrer">
+                <a
+                  className="mt-5 inline-flex font-medium text-[#0B1121] underline"
+                  href={store.map_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   View our location on Google Maps
                 </a>
               )}
@@ -1160,7 +1202,13 @@ function ContactPage({
                 <h3 className="text-lg font-semibold">Follow us</h3>
                 <div className="mt-3 flex flex-wrap gap-3">
                   {Object.entries(store.social_links ?? {}).map(([network, url]) => (
-                    <a key={network} href={url} target="_blank" rel="noreferrer" className="border border-slate-200 px-3 py-2 text-sm font-medium capitalize hover:border-slate-400">
+                    <a
+                      key={network}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="border border-slate-200 px-3 py-2 text-sm font-medium capitalize hover:border-slate-400"
+                    >
                       {network}
                     </a>
                   ))}
@@ -1220,7 +1268,9 @@ function LeadCaptureForm({ slug, product }: { slug: string; product?: Product })
         <Form.Item name="message" label="How can we help?">
           <Input.TextArea rows={3} />
         </Form.Item>
-        <Button type="primary" htmlType="submit" loading={submitting}>Send enquiry</Button>
+        <Button type="primary" htmlType="submit" loading={submitting}>
+          Send enquiry
+        </Button>
       </Form>
     </section>
   )

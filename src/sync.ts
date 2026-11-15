@@ -238,16 +238,18 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
   const response = await supabase
     .from('products')
     .select(
-      'id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, base_unit, active, description, image_url, image_urls, online_published, is_featured, categories(name), product_packaging(id,name,units_per_pack,sku,price_kobo,active)',
+      'id, name, sku, price_kobo, cost_price_kobo, minimum_selling_price_kobo, stock_quantity, low_stock_threshold, base_unit, active, description, image_url, image_urls, online_published, is_featured, categories(name), product_packaging(id,name,units_per_pack,sku,price_kobo,active), product_barcode_aliases(id,barcode,label,active)',
     )
     .order('name')
   let data: any[] | null = response.data
   let error = response.error
   if (
-    error?.code === '42703' &&
+    error &&
+    (error.code === '42703' || error.message.includes('product_barcode_aliases')) &&
     (error.message.includes('image_urls') ||
       error.message.includes('is_featured') ||
-      error.message.includes('minimum_selling_price_kobo'))
+      error.message.includes('minimum_selling_price_kobo') ||
+      error.message.includes('product_barcode_aliases'))
   ) {
     const legacy = await supabase
       .from('products')
@@ -282,6 +284,14 @@ export async function pullProducts(): Promise<{ loaded: number; error?: string }
           sku: pack.sku ?? undefined,
           price: pack.price_kobo / 100,
           active: pack.active,
+        })),
+      barcodeAliases: (row.product_barcode_aliases ?? [])
+        .filter((alias: any) => alias.active !== false)
+        .map((alias: any) => ({
+          id: alias.id,
+          barcode: alias.barcode,
+          label: alias.label ?? undefined,
+          active: alias.active,
         })),
       lowStockThreshold: row.low_stock_threshold ?? 10,
       category: category?.name ?? 'Uncategorised',

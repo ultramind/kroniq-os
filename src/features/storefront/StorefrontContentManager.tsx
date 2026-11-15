@@ -1,4 +1,11 @@
-import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -366,13 +373,14 @@ export function StorefrontContentManager() {
       >
         <Form form={sectionForm} layout="vertical" onFinish={(values) => void saveSection(values)}>
           <Form.Item name="section_type" label="Section type" rules={[{ required: true }]}>
-          <Select
+            <Select
               options={Object.entries(labels)
                 .filter(([value]) => value !== 'testimonials')
                 .map(([value, label]) => ({
-                value,
-                label,
-                disabled: value === 'banner' && bannerCount >= 2 && editingSection?.section_type !== 'banner',
+                  value,
+                  label,
+                  disabled:
+                    value === 'banner' && bannerCount >= 2 && editingSection?.section_type !== 'banner',
                 }))}
             />
           </Form.Item>
@@ -417,14 +425,20 @@ export function StorefrontContentManager() {
               const imageUrl = sectionForm.getFieldValue('image_url') as string | undefined
               return (
                 <div className="mb-5 border border-slate-200 p-3">
-                  <div className="mb-2 text-sm font-medium">{isBanner ? 'Banner image' : 'Section image'}</div>
-                  {imageUrl && <img src={imageUrl} alt="Section preview" className="mb-3 h-28 w-full object-cover" />}
+                  <div className="mb-2 text-sm font-medium">
+                    {isBanner ? 'Banner image' : 'Section image'}
+                  </div>
+                  {imageUrl && (
+                    <img src={imageUrl} alt="Section preview" className="mb-3 h-28 w-full object-cover" />
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <Upload
                       accept="image/jpeg,image/png,image/webp"
                       showUploadList={false}
                       customRequest={({ file, onSuccess, onError }) => {
-                        void uploadVisual(file as File, 'sections', (url) => sectionForm.setFieldValue('image_url', url))
+                        void uploadVisual(file as File, 'sections', (url) =>
+                          sectionForm.setFieldValue('image_url', url),
+                        )
                           .then(() => onSuccess?.({}))
                           .catch((error: Error) => {
                             api.error(error.message || 'Could not upload section image.')
@@ -437,7 +451,11 @@ export function StorefrontContentManager() {
                       </Button>
                     </Upload>
                     {imageUrl && (
-                      <Button danger icon={<DeleteOutlined />} onClick={() => sectionForm.setFieldValue('image_url', undefined)}>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => sectionForm.setFieldValue('image_url', undefined)}
+                      >
                         Remove image
                       </Button>
                     )}

@@ -61,9 +61,14 @@ export function StorefrontLeads() {
     if (!supabase || nextStatus === lead.status) return
     setUpdatingId(lead.id)
     try {
-      const { error } = await supabase.from('storefront_leads').update({ status: nextStatus }).eq('id', lead.id)
+      const { error } = await supabase
+        .from('storefront_leads')
+        .update({ status: nextStatus })
+        .eq('id', lead.id)
       if (error) throw error
-      setLeads((current) => current.map((item) => (item.id === lead.id ? { ...item, status: nextStatus } : item)))
+      setLeads((current) =>
+        current.map((item) => (item.id === lead.id ? { ...item, status: nextStatus } : item)),
+      )
       api.success('Lead status updated.')
     } catch (error) {
       api.error(error instanceof Error ? error.message : 'Could not update lead status.')
@@ -90,7 +95,9 @@ export function StorefrontLeads() {
       render: (_, lead) => (
         <div>
           <div className="font-medium text-[#0B1121]">{lead.name}</div>
-          <a className="text-sm text-slate-500" href={`tel:${lead.phone}`}>{lead.phone}</a>
+          <a className="text-sm text-slate-500" href={`tel:${lead.phone}`}>
+            {lead.phone}
+          </a>
           {lead.email && <div className="text-xs text-slate-500">{lead.email}</div>}
         </div>
       ),
@@ -101,14 +108,20 @@ export function StorefrontLeads() {
       render: (_, lead) => (
         <div className="max-w-xs">
           {lead.products?.name && <Tag className="!m-0">{lead.products.name}</Tag>}
-          {lead.message && <p className="mb-0 mt-2 whitespace-pre-line text-sm text-slate-600">{lead.message}</p>}
+          {lead.message && (
+            <p className="mb-0 mt-2 whitespace-pre-line text-sm text-slate-600">{lead.message}</p>
+          )}
         </div>
       ),
     },
     {
       title: 'Received',
       dataIndex: 'created_at',
-      render: (value) => <span className="whitespace-nowrap text-sm text-slate-600">{dayjs(value).format('DD MMM YYYY, h:mm A')}</span>,
+      render: (value) => (
+        <span className="whitespace-nowrap text-sm text-slate-600">
+          {dayjs(value).format('DD MMM YYYY, h:mm A')}
+        </span>
+      ),
     },
     {
       title: 'Status',
@@ -120,7 +133,9 @@ export function StorefrontLeads() {
       key: 'action',
       render: (_, lead) => (
         <div className="flex items-center gap-2">
-          <Button size="small" icon={<PhoneOutlined />} href={`tel:${lead.phone}`}>Call</Button>
+          <Button size="small" icon={<PhoneOutlined />} href={`tel:${lead.phone}`}>
+            Call
+          </Button>
           <Select
             size="small"
             value={lead.status}
@@ -134,15 +149,44 @@ export function StorefrontLeads() {
   ]
 
   return (
-    <Card title="Customer enquiries" extra={<Button icon={<CheckOutlined />} onClick={() => void load()} loading={loading}>Refresh</Button>}>
+    <Card
+      title="Customer enquiries"
+      extra={
+        <Button icon={<CheckOutlined />} onClick={() => void load()} loading={loading}>
+          Refresh
+        </Button>
+      }
+    >
       {holder}
-      <p className="mb-5 text-sm text-slate-500">Leads submitted from your public storefront contact and product enquiry forms.</p>
+      <p className="mb-5 text-sm text-slate-500">
+        Leads submitted from your public storefront contact and product enquiry forms.
+      </p>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} prefix={<SearchOutlined />} placeholder="Search name, phone, email, or product" allowClear />
-        <Select className="sm:w-40" value={status} onChange={setStatus} options={[{ value: 'all', label: 'All statuses' }, ...Object.entries(statusMeta).map(([value, meta]) => ({ value, label: meta.label }))]} />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          prefix={<SearchOutlined />}
+          placeholder="Search name, phone, email, or product"
+          allowClear
+        />
+        <Select
+          className="sm:w-40"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: 'all', label: 'All statuses' },
+            ...Object.entries(statusMeta).map(([value, meta]) => ({ value, label: meta.label })),
+          ]}
+        />
       </div>
       <div className="overflow-x-auto">
-        <Table rowKey="id" columns={columns} dataSource={visibleLeads} loading={loading} pagination={{ pageSize: 10, showSizeChanger: false }} />
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={visibleLeads}
+          loading={loading}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
+        />
       </div>
     </Card>
   )

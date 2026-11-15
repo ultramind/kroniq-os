@@ -37,7 +37,7 @@ export function StockCountModal({ product, open, saving, onClose, onSave }: Prop
         className="mt-5"
       >
         <Form.Item name="physicalCount" label="Physical count" rules={[{ required: true }]}>
-          <InputNumber min={0} precision={0} size="large" className="w-full" />
+          <InputNumber min={0} precision={0} inputMode="numeric" size="large" className="w-full" />
         </Form.Item>
       </Form>
     </Modal>

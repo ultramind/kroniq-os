@@ -141,7 +141,7 @@ export function App({
       if (!profile) return
       const { data: store } = await supabase
         .from('stores')
-        .select('currency_code,flexible_pricing_enabled,organization_id')
+        .select('currency_code,flexible_pricing_enabled,organization_id,default_low_stock_threshold')
         .eq('id', profile.store_id)
         .maybeSingle()
       if (store?.currency_code)
@@ -149,6 +149,7 @@ export function App({
           ...getStoreSettings(),
           currencyCode: store.currency_code,
           flexiblePricingEnabled: store.flexible_pricing_enabled ?? getStoreSettings().flexiblePricingEnabled,
+          lowStock: store.default_low_stock_threshold ?? getStoreSettings().lowStock,
         })
       if (store?.flexible_pricing_enabled !== undefined)
         setFlexiblePricingEnabled(store.flexible_pricing_enabled)
@@ -218,7 +219,9 @@ export function App({
       products.filter(
         (product) =>
           product.active !== false &&
-          `${product.name} ${product.sku}`.toLowerCase().includes(state.search.toLowerCase()),
+          `${product.name} ${product.sku} ${(product.barcodeAliases ?? []).map((alias) => `${alias.barcode} ${alias.label ?? ''}`).join(' ')}`
+            .toLowerCase()
+            .includes(state.search.toLowerCase()),
       ),
     [products, state.search],
   )
@@ -226,7 +229,11 @@ export function App({
   const discount = Math.round(subtotal * state.discountPercent) / 100
   const total = subtotal - discount
   function handleBarcodeLookup(code: string): Product | undefined {
-    const product = products.find((item) => item.active !== false && item.sku === code.trim())
+    const product = products.find(
+      (item) =>
+        item.active !== false &&
+        (item.sku === code.trim() || item.barcodeAliases?.some((alias) => alias.barcode === code.trim())),
+    )
     if (!code.trim()) return
     if (!product) {
       if (state.role !== 'cashier') {
@@ -457,6 +464,12 @@ export function App({
         stock: values.stock,
         lowStockThreshold: values.lowStockThreshold,
         category: categoryName,
+        barcodeAliases: (values.barcodeAliases ?? [])
+          .filter((alias) => alias.barcode?.trim())
+          .map((alias) => ({
+            barcode: alias.barcode.trim(),
+            label: alias.label?.trim() || undefined,
+          })),
       }
       if (supabase) {
         if (!navigator.onLine) {
@@ -478,6 +491,7 @@ export function App({
                 : Math.round(product.minimumSellingPrice * 100),
             stock_quantity: product.stock,
             low_stock_threshold: product.lowStockThreshold,
+            barcode_aliases: product.barcodeAliases,
           },
         })
         if (error) {
@@ -587,6 +601,7 @@ export function App({
       imageUrls?: string[]
       onlinePublished?: boolean
       featured?: boolean
+      barcodeAliases?: Array<{ barcode: string; label?: string }>
     },
   ) {
     try {

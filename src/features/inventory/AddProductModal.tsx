@@ -1,4 +1,10 @@
-import { BarcodeOutlined, CameraOutlined, PrinterOutlined } from '@ant-design/icons'
+import {
+  BarcodeOutlined,
+  CameraOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  PrinterOutlined,
+} from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Modal, Select, Space } from 'antd'
 import type { InputRef } from 'antd'
 import { useEffect, useRef, useState } from 'react'
@@ -6,6 +12,7 @@ import JsBarcode from 'jsbarcode'
 import { CameraBarcodeScannerModal } from '../pos/CameraBarcodeScannerModal'
 import { CurrencyInput } from '../../components/CurrencyInput'
 import { generateInternalBarcode } from '../../lib/barcode'
+import { getStoreSettings } from '../../lib/storeSettings'
 
 export type ProductFormValues = {
   name: string
@@ -16,6 +23,7 @@ export type ProductFormValues = {
   minimumSellingPrice?: number
   stock: number
   lowStockThreshold: number
+  barcodeAliases?: Array<{ barcode: string; label?: string }>
 }
 type Props = {
   open: boolean
@@ -38,7 +46,12 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
       return
     }
     form.resetFields()
-    form.setFieldsValue({ sku: initialSku, category: ['Uncategorised'], stock: 0, lowStockThreshold: 10 })
+    form.setFieldsValue({
+      sku: initialSku,
+      category: ['Uncategorised'],
+      stock: 0,
+      lowStockThreshold: getStoreSettings().lowStock,
+    })
     const focusTimer = window.setTimeout(() => barcodeInputRef.current?.focus(), 100)
     return () => window.clearTimeout(focusTimer)
   }, [form, initialSku, open])
@@ -126,6 +139,44 @@ export function AddProductModal({ open, saving, initialSku, categories, onClose,
               )
             }
           </Form.Item>
+          <Form.List name="barcodeAliases">
+            {(fields, { add, remove }) => (
+              <div className="mb-5 border border-slate-200 p-3">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <label className="font-medium">Additional barcodes</label>
+                  <Button
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={() => add({})}
+                    disabled={fields.length >= 20}
+                  >
+                    Add barcode
+                  </Button>
+                </div>
+                <p className="mb-3 text-xs text-slate-500">
+                  Use for flavours or supplier codes that share this product’s price and stock.
+                </p>
+                <div className="space-y-2">
+                  {fields.map((field) => (
+                    <div key={field.key} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                      <Form.Item {...field} name={[field.name, 'barcode']} noStyle>
+                        <Input placeholder="Barcode" />
+                      </Form.Item>
+                      <Form.Item {...field} name={[field.name, 'label']} noStyle>
+                        <Input placeholder="Name / flavour (optional)" />
+                      </Form.Item>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        aria-label="Remove additional barcode"
+                        onClick={() => remove(field.name)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Form.List>
           <Form.Item
             name="name"
             label="Product name"

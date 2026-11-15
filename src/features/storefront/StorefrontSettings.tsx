@@ -95,7 +95,11 @@ export function StorefrontSettings() {
           .select('event_type')
           .eq('store_id', profile.store_id)
           .gte('created_at', since),
-        supabase.from('storefront_leads').select('id').eq('store_id', profile.store_id).gte('created_at', since),
+        supabase
+          .from('storefront_leads')
+          .select('id')
+          .eq('store_id', profile.store_id)
+          .gte('created_at', since),
       ])
       if (!eventsResult.error && !leadsResult.error) {
         const events = eventsResult.data ?? []
@@ -304,10 +308,18 @@ export function StorefrontSettings() {
         Create a branded public catalogue. Only products marked as published online will appear.
       </p>
       <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden border border-slate-200 bg-slate-200 sm:grid-cols-4">
-        <div className="bg-white p-4"><Statistic title="Views · 30 days" value={insights.views} /></div>
-        <div className="bg-white p-4"><Statistic title="Product views" value={insights.productViews} /></div>
-        <div className="bg-white p-4"><Statistic title="WhatsApp clicks" value={insights.whatsappClicks} /></div>
-        <div className="bg-white p-4"><Statistic title="Enquiries" value={insights.leads} /></div>
+        <div className="bg-white p-4">
+          <Statistic title="Views · 30 days" value={insights.views} />
+        </div>
+        <div className="bg-white p-4">
+          <Statistic title="Product views" value={insights.productViews} />
+        </div>
+        <div className="bg-white p-4">
+          <Statistic title="WhatsApp clicks" value={insights.whatsappClicks} />
+        </div>
+        <div className="bg-white p-4">
+          <Statistic title="Enquiries" value={insights.leads} />
+        </div>
       </div>
       <Form
         form={form}
@@ -522,51 +534,51 @@ export function StorefrontSettings() {
         <div className="mb-6 grid gap-5 lg:col-span-2 lg:grid-cols-2">
           {canUseLogo && (
             <div className="border border-slate-200 p-4">
-            <label className="mb-2 block font-medium">Storefront logo</label>
-            <div className="flex items-center gap-3">
-              <Form.Item name="logoUrl" noStyle>
-                <Input type="hidden" />
-              </Form.Item>
-              {form.getFieldValue('logoUrl') && (
-                <Image
-                  src={form.getFieldValue('logoUrl')}
-                  alt="Store logo"
-                  width={64}
-                  height={64}
-                  className="border border-slate-200 object-contain"
-                  preview
-                />
-              )}
-              {form.getFieldValue('logoUrl') && (
-                <Button
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => form.setFieldValue('logoUrl', undefined)}
+              <label className="mb-2 block font-medium">Storefront logo</label>
+              <div className="flex items-center gap-3">
+                <Form.Item name="logoUrl" noStyle>
+                  <Input type="hidden" />
+                </Form.Item>
+                {form.getFieldValue('logoUrl') && (
+                  <Image
+                    src={form.getFieldValue('logoUrl')}
+                    alt="Store logo"
+                    width={64}
+                    height={64}
+                    className="border border-slate-200 object-contain"
+                    preview
+                  />
+                )}
+                {form.getFieldValue('logoUrl') && (
+                  <Button
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    onClick={() => form.setFieldValue('logoUrl', undefined)}
+                  >
+                    Remove
+                  </Button>
+                )}
+                <Upload
+                  accept="image/jpeg,image/png,image/webp"
+                  showUploadList={false}
+                  customRequest={({ file, onSuccess, onError }) => {
+                    void uploadLogo(file as File)
+                      .then(() => onSuccess?.({}))
+                      .catch((error: Error) => {
+                        api.error(error.message || 'Could not upload logo.')
+                        onError?.(error)
+                      })
+                  }}
                 >
-                  Remove
-                </Button>
-              )}
-              <Upload
-                accept="image/jpeg,image/png,image/webp"
-                showUploadList={false}
-                customRequest={({ file, onSuccess, onError }) => {
-                  void uploadLogo(file as File)
-                    .then(() => onSuccess?.({}))
-                    .catch((error: Error) => {
-                      api.error(error.message || 'Could not upload logo.')
-                      onError?.(error)
-                    })
-                }}
-              >
-                <Button icon={<UploadOutlined />} loading={uploadingLogo}>
-                  Upload logo
-                </Button>
-              </Upload>
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              Growth plan or higher · JPG, PNG, or WebP · 2 MB maximum.
-            </p>
+                  <Button icon={<UploadOutlined />} loading={uploadingLogo}>
+                    Upload logo
+                  </Button>
+                </Upload>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Growth plan or higher · JPG, PNG, or WebP · 2 MB maximum.
+              </p>
             </div>
           )}
           <div className="border border-slate-200 p-4">
@@ -582,146 +594,147 @@ export function StorefrontSettings() {
           </div>
         </div>
         <div className="mb-6 grid gap-5 lg:col-span-2 lg:grid-cols-2">
-        <Form.Item shouldUpdate noStyle>
-          {() => {
-            const heroBackgroundUrl = form.getFieldValue('heroBackgroundUrl') as string | undefined
-            return (
-              <div className="border border-slate-200 p-4">
-                <label className="mb-2 block font-medium">Hero background</label>
-                <Form.Item name="heroBackgroundUrl" noStyle>
-                  <Input type="hidden" />
-                </Form.Item>
-                <div className="flex flex-wrap items-center gap-3">
-                  {heroBackgroundUrl && (
-                    <Image
-                      src={heroBackgroundUrl}
-                      alt="Hero background"
-                      width={144}
-                      height={80}
-                      className="border border-slate-200 object-cover"
-                      preview
-                    />
-                  )}
-                  {heroBackgroundUrl && (
-                    <Button
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      onClick={() => form.setFieldValue('heroBackgroundUrl', undefined)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                  <Upload
-                    accept="image/jpeg,image/png,image/webp"
-                    showUploadList={false}
-                    customRequest={({ file, onSuccess, onError }) => {
-                      void uploadHeroBackground(file as File)
-                        .then(() => onSuccess?.({}))
-                        .catch((error: Error) => {
-                          api.error(error.message || 'Could not upload hero background.')
-                          onError?.(error)
-                        })
-                    }}
-                  >
-                    <Button icon={<UploadOutlined />} loading={uploadingHeroBackground}>
-                      Upload background
-                    </Button>
-                  </Upload>
-                </div>
-                <p className="mb-0 mt-2 text-xs text-slate-500">
-                  Optional. This image fills the full hero section; your primary colour remains the fallback.
-                </p>
-              </div>
-            )
-          }}
-        </Form.Item>
-        <Form.Item name="heroImageUrls" hidden>
-          <Input />
-        </Form.Item>
-        <Form.Item name="heroImageCaptions" hidden>
-          <Input />
-        </Form.Item>
-        <Form.Item shouldUpdate noStyle>
-          {() => {
-            const images = heroImages()
-            const captions = heroCaptions()
-            return (
-              <div className="border border-slate-200 p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="font-medium">Hero images</label>
-                  <span className="text-xs text-slate-500">
-                    {images.length} / {MAX_HERO_IMAGES}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {images.map((url, index) => (
-                    <div key={url} className="w-44 space-y-2">
-                      <div className="relative h-24 overflow-hidden border border-slate-200">
-                        <Image
-                          src={url}
-                          alt={`Hero image ${index + 1}`}
-                          className="h-full w-full object-cover"
-                          preview
-                        />
-                        <Button
-                          danger
-                          type="text"
-                          size="small"
-                          className="!absolute right-0 top-0 !bg-white"
-                          aria-label={`Remove hero image ${index + 1}`}
-                          icon={<DeleteOutlined />}
-                          onClick={() => {
-                            form.setFieldValue(
-                              'heroImageUrls',
-                              images.filter((_, itemIndex) => itemIndex !== index),
-                            )
-                            form.setFieldValue(
-                              'heroImageCaptions',
-                              captions.filter((_, itemIndex) => itemIndex !== index),
-                            )
-                          }}
-                        />
-                      </div>
-                      <Input
-                        value={captions[index] ?? ''}
-                        maxLength={100}
-                        placeholder={`Image ${index + 1} caption (optional)`}
-                        onChange={(event) => {
-                          const nextCaptions = [...captions]
-                          nextCaptions[index] = event.target.value
-                          form.setFieldValue('heroImageCaptions', nextCaptions)
-                        }}
+          <Form.Item shouldUpdate noStyle>
+            {() => {
+              const heroBackgroundUrl = form.getFieldValue('heroBackgroundUrl') as string | undefined
+              return (
+                <div className="border border-slate-200 p-4">
+                  <label className="mb-2 block font-medium">Hero background</label>
+                  <Form.Item name="heroBackgroundUrl" noStyle>
+                    <Input type="hidden" />
+                  </Form.Item>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {heroBackgroundUrl && (
+                      <Image
+                        src={heroBackgroundUrl}
+                        alt="Hero background"
+                        width={144}
+                        height={80}
+                        className="border border-slate-200 object-cover"
+                        preview
                       />
-                    </div>
-                  ))}
-                  {images.length < MAX_HERO_IMAGES && (
+                    )}
+                    {heroBackgroundUrl && (
+                      <Button
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={() => form.setFieldValue('heroBackgroundUrl', undefined)}
+                      >
+                        Remove
+                      </Button>
+                    )}
                     <Upload
                       accept="image/jpeg,image/png,image/webp"
                       showUploadList={false}
                       customRequest={({ file, onSuccess, onError }) => {
-                        void uploadHeroImage(file as File)
+                        void uploadHeroBackground(file as File)
                           .then(() => onSuccess?.({}))
                           .catch((error: Error) => {
-                            api.error(error.message || 'Could not upload image.')
+                            api.error(error.message || 'Could not upload hero background.')
                             onError?.(error)
                           })
                       }}
                     >
-                      <Button icon={<UploadOutlined />} loading={uploading}>
-                        Upload hero image
+                      <Button icon={<UploadOutlined />} loading={uploadingHeroBackground}>
+                        Upload background
                       </Button>
                     </Upload>
-                  )}
+                  </div>
+                  <p className="mb-0 mt-2 text-xs text-slate-500">
+                    Optional. This image fills the full hero section; your primary colour remains the
+                    fallback.
+                  </p>
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  Maximum two images. Add an optional caption for each slide. JPG, PNG, or WebP, up to 5 MB
-                  each.
-                </p>
-              </div>
-            )
-          }}
-        </Form.Item>
+              )
+            }}
+          </Form.Item>
+          <Form.Item name="heroImageUrls" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="heroImageCaptions" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item shouldUpdate noStyle>
+            {() => {
+              const images = heroImages()
+              const captions = heroCaptions()
+              return (
+                <div className="border border-slate-200 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="font-medium">Hero images</label>
+                    <span className="text-xs text-slate-500">
+                      {images.length} / {MAX_HERO_IMAGES}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {images.map((url, index) => (
+                      <div key={url} className="w-44 space-y-2">
+                        <div className="relative h-24 overflow-hidden border border-slate-200">
+                          <Image
+                            src={url}
+                            alt={`Hero image ${index + 1}`}
+                            className="h-full w-full object-cover"
+                            preview
+                          />
+                          <Button
+                            danger
+                            type="text"
+                            size="small"
+                            className="!absolute right-0 top-0 !bg-white"
+                            aria-label={`Remove hero image ${index + 1}`}
+                            icon={<DeleteOutlined />}
+                            onClick={() => {
+                              form.setFieldValue(
+                                'heroImageUrls',
+                                images.filter((_, itemIndex) => itemIndex !== index),
+                              )
+                              form.setFieldValue(
+                                'heroImageCaptions',
+                                captions.filter((_, itemIndex) => itemIndex !== index),
+                              )
+                            }}
+                          />
+                        </div>
+                        <Input
+                          value={captions[index] ?? ''}
+                          maxLength={100}
+                          placeholder={`Image ${index + 1} caption (optional)`}
+                          onChange={(event) => {
+                            const nextCaptions = [...captions]
+                            nextCaptions[index] = event.target.value
+                            form.setFieldValue('heroImageCaptions', nextCaptions)
+                          }}
+                        />
+                      </div>
+                    ))}
+                    {images.length < MAX_HERO_IMAGES && (
+                      <Upload
+                        accept="image/jpeg,image/png,image/webp"
+                        showUploadList={false}
+                        customRequest={({ file, onSuccess, onError }) => {
+                          void uploadHeroImage(file as File)
+                            .then(() => onSuccess?.({}))
+                            .catch((error: Error) => {
+                              api.error(error.message || 'Could not upload image.')
+                              onError?.(error)
+                            })
+                        }}
+                      >
+                        <Button icon={<UploadOutlined />} loading={uploading}>
+                          Upload hero image
+                        </Button>
+                      </Upload>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Maximum two images. Add an optional caption for each slide. JPG, PNG, or WebP, up to 5 MB
+                    each.
+                  </p>
+                </div>
+              )
+            }}
+          </Form.Item>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
           <Form.Item name="phone" label="Phone">
@@ -737,7 +750,12 @@ export function StorefrontSettings() {
         <div className="mb-6 grid gap-5 lg:col-span-2 lg:grid-cols-2">
           <div className="border border-slate-200 p-4">
             <div className="mb-3 font-medium">Business details</div>
-            <Form.Item name="mapUrl" label="Google Maps link" extra="Paste a Google Maps share link." className="!mb-4">
+            <Form.Item
+              name="mapUrl"
+              label="Google Maps link"
+              extra="Paste a Google Maps share link."
+              className="!mb-4"
+            >
               <Input inputMode="url" placeholder="https://maps.google.com/..." />
             </Form.Item>
             <Form.List name="businessHours">
@@ -787,11 +805,20 @@ export function StorefrontSettings() {
             <Form.Item name="seoTitle" label="Page title" extra="Used in browser tabs and Google results.">
               <Input maxLength={70} placeholder={`${storeName || 'Your business'} | Online shop`} />
             </Form.Item>
-            <Form.Item name="socialImageUrl" label="Social-share image URL" extra="Optional image used when the link is shared.">
+            <Form.Item
+              name="socialImageUrl"
+              label="Social-share image URL"
+              extra="Optional image used when the link is shared."
+            >
               <Input inputMode="url" placeholder="https://..." />
             </Form.Item>
           </div>
-          <Form.Item name="seoDescription" label="Search description" extra="A concise summary for search engines and sharing." className="!mb-0">
+          <Form.Item
+            name="seoDescription"
+            label="Search description"
+            extra="A concise summary for search engines and sharing."
+            className="!mb-0"
+          >
             <Input.TextArea rows={2} maxLength={160} />
           </Form.Item>
         </div>

@@ -82,6 +82,9 @@ export function InventoryOverview({ products, role, onAdjustProduct, onCountProd
                       <Text strong className="block break-words leading-5">
                         {product.name}
                       </Text>
+                      <Text type="secondary" className="mt-0.5 block text-xs leading-5">
+                        {product.category || 'Uncategorised'}
+                      </Text>
                       <Text type="danger" className="mt-0.5 block text-xs leading-5">
                         {product.stock} in stock · alert at {product.lowStockThreshold ?? lowStockThreshold}
                       </Text>

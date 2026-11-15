@@ -44,7 +44,7 @@ export function StockAdjustmentModal({ product, open, saving, onClose, onSave }:
           ]}
           extra="Use a positive number for stock in and a negative number for stock out."
         >
-          <InputNumber precision={0} className="w-full" />
+          <InputNumber precision={0} inputMode="decimal" className="w-full" />
         </Form.Item>
         <Form.Item name="reason" label="Reason" rules={[{ required: true }]}>
           <Radio.Group

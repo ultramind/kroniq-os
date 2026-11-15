@@ -26,6 +26,7 @@ import {
   InboxOutlined,
   MoreOutlined,
   PrinterOutlined,
+  PlusOutlined,
   StopOutlined,
   UndoOutlined,
   UploadOutlined,
@@ -55,6 +56,7 @@ type Values = {
   imageUrls?: string[]
   onlinePublished?: boolean
   featured?: boolean
+  barcodeAliases?: Array<{ barcode: string; label?: string }>
 }
 type Props = {
   products: Product[]
@@ -79,7 +81,9 @@ export function ProductManagement({ products, role, onSave, onPublishAll, onLife
   const rows = useMemo(
     () =>
       products.filter((product) =>
-        `${product.name} ${product.sku}`.toLowerCase().includes(search.toLowerCase()),
+        `${product.name} ${product.sku} ${(product.barcodeAliases ?? []).map((alias) => `${alias.barcode} ${alias.label ?? ''}`).join(' ')}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
       ),
     [products, search],
   )
@@ -204,6 +208,7 @@ export function ProductManagement({ products, role, onSave, onPublishAll, onLife
       imageUrls: product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : [],
       onlinePublished: product.onlinePublished,
       featured: product.featured,
+      barcodeAliases: product.barcodeAliases ?? [],
     })
   }
 
@@ -483,6 +488,44 @@ export function ProductManagement({ products, role, onSave, onPublishAll, onLife
               )
             }
           </Form.Item>
+          <Form.List name="barcodeAliases">
+            {(fields, { add, remove }) => (
+              <div className="mb-5 border border-slate-200 p-3">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <Text strong>Additional barcodes</Text>
+                  <Button
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={() => add({})}
+                    disabled={fields.length >= 20}
+                  >
+                    Add barcode
+                  </Button>
+                </div>
+                <Text type="secondary" className="mb-3 block text-xs">
+                  These scan into this product and share its price and stock.
+                </Text>
+                <div className="space-y-2">
+                  {fields.map((field) => (
+                    <div key={field.key} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                      <Form.Item {...field} name={[field.name, 'barcode']} noStyle>
+                        <Input placeholder="Barcode" />
+                      </Form.Item>
+                      <Form.Item {...field} name={[field.name, 'label']} noStyle>
+                        <Input placeholder="Name / flavour (optional)" />
+                      </Form.Item>
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        aria-label="Remove additional barcode"
+                        onClick={() => remove(field.name)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Form.List>
           <Form.Item name="description" label="Online description">
             <Input.TextArea rows={3} />
           </Form.Item>

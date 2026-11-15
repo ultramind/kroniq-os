@@ -29,6 +29,12 @@ export interface ProductPackage {
   minimumSellingPrice?: number
   active?: boolean
 }
+export interface ProductBarcodeAlias {
+  id?: string
+  barcode: string
+  label?: string
+  active?: boolean
+}
 export interface Product {
   id: string
   name: string
@@ -40,6 +46,7 @@ export interface Product {
   category: string
   baseUnit?: string
   packages?: ProductPackage[]
+  barcodeAliases?: ProductBarcodeAlias[]
   sourceProductId?: string
   packagingId?: string
   packageName?: string

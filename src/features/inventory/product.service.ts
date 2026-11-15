@@ -17,6 +17,7 @@ export type ProductDetails = Pick<
   | 'imageUrls'
   | 'onlinePublished'
   | 'featured'
+  | 'barcodeAliases'
 >
 
 export type ProductLifecycleAction = 'archive' | 'restore' | 'delete'
@@ -64,6 +65,12 @@ export async function updateProductDetails(product: Product, details: ProductDet
         image_urls: imageUrls,
         online_published: details.onlinePublished ?? false,
         is_featured: details.featured ?? false,
+        barcode_aliases: (details.barcodeAliases ?? [])
+          .filter((alias) => alias.barcode?.trim())
+          .map((alias) => ({
+            barcode: alias.barcode.trim(),
+            label: alias.label?.trim() || null,
+          })),
       },
     })
     if (error) throw error
@@ -71,5 +78,12 @@ export async function updateProductDetails(product: Product, details: ProductDet
   await db.products.update(product.id, {
     ...details,
     name: details.name.trim().toUpperCase(),
+    barcodeAliases: details.barcodeAliases
+      ?.filter((alias) => alias.barcode?.trim())
+      .map((alias) => ({
+        ...alias,
+        barcode: alias.barcode.trim(),
+        label: alias.label?.trim() || undefined,
+      })),
   })
 }

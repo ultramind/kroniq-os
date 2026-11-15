@@ -1,6 +1,7 @@
 import { PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Statistic } from 'antd'
 import { formatNaira } from '../lib/currency'
+import { getStoreSettings } from '../lib/storeSettings'
 import { ProductManagement } from '../features/inventory/ProductManagement'
 import type { Product, Role } from '../types'
 
@@ -31,13 +32,16 @@ export function ProductsPage({
       imageUrls?: string[]
       onlinePublished?: boolean
       featured?: boolean
+      barcodeAliases?: Array<{ barcode: string; label?: string }>
     },
   ) => Promise<void>
   onProductLifecycle: (product: Product, action: 'archive' | 'restore' | 'delete') => Promise<void>
   onPublishAllProducts: () => Promise<number>
 }) {
   const active = products.filter((product) => product.active !== false)
-  const lowStock = active.filter((product) => product.stock <= (product.lowStockThreshold ?? 10)).length
+  const lowStock = active.filter(
+    (product) => product.stock <= (product.lowStockThreshold ?? getStoreSettings().lowStock),
+  ).length
   const sellingValue = active.reduce((sum, product) => sum + product.stock * product.price, 0)
   const costValue = active.reduce((sum, product) => sum + product.stock * product.costPrice, 0)
   return (
